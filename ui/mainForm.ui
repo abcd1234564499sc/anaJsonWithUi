@@ -1,0 +1,611 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>mainForm</class>
+ <widget class="QMainWindow" name="mainForm">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>800</width>
+    <height>600</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>JSON返回值解析工具</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout_3" stretch="0,4">
+    <item>
+     <widget class="QTabWidget" name="tabWidget">
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
+      <widget class="QWidget" name="tab">
+       <attribute name="title">
+        <string>报文处理</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout">
+        <item>
+         <widget class="QCheckBox" name="ifPacketUseHttpsCheckBox">
+          <property name="font">
+           <font>
+            <family>Arial</family>
+            <pointsize>10</pointsize>
+           </font>
+          </property>
+          <property name="text">
+           <string>使用Https</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout">
+          <item>
+           <widget class="QTextEdit" name="packetTextEdit">
+            <property name="font">
+             <font>
+              <family>Arial</family>
+              <pointsize>10</pointsize>
+              <weight>50</weight>
+              <bold>false</bold>
+             </font>
+            </property>
+            <property name="html">
+             <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Arial'; font-size:10pt; font-weight:400; font-style:normal;&quot;&gt;
+&lt;p style=&quot;-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:'新宋体'; font-size:11pt;&quot;&gt;&lt;br /&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QVBoxLayout" name="verticalLayout_2">
+            <item>
+             <widget class="QPushButton" name="addCharIdenButton">
+              <property name="text">
+               <string>添加标识</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="clearCharIdenButton">
+              <property name="text">
+               <string>清空标识</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="startAnaResponseButton">
+              <property name="enabled">
+               <bool>true</bool>
+              </property>
+              <property name="text">
+               <string>解析结果</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="startSendButton">
+              <property name="enabled">
+               <bool>false</bool>
+              </property>
+              <property name="text">
+               <string>批量输入</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="verticalSpacer">
+              <property name="orientation">
+               <enum>Qt::Vertical</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>20</width>
+                <height>40</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="responseAnaTab">
+       <attribute name="title">
+        <string>返回值解析</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_4">
+        <item>
+         <widget class="QTreeWidget" name="responseAnaResultTreeWidget">
+          <column>
+           <property name="text">
+            <string>复选框</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>键名</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>值类型</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>请求字符串</string>
+           </property>
+          </column>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="tab_4">
+       <attribute name="title">
+        <string>输入设置</string>
+       </attribute>
+       <layout class="QHBoxLayout" name="horizontalLayout_2">
+        <item>
+         <widget class="QTabWidget" name="inputTabWidget">
+          <property name="currentIndex">
+           <number>0</number>
+          </property>
+          <widget class="QWidget" name="index1_tab">
+           <attribute name="title">
+            <string>序号1</string>
+           </attribute>
+           <layout class="QHBoxLayout" name="horizontalLayout_3">
+            <item>
+             <widget class="QTableWidget" name="tableWidget_index1">
+              <property name="columnCount">
+               <number>1</number>
+              </property>
+              <column>
+               <property name="text">
+                <string>输入值</string>
+               </property>
+              </column>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </widget>
+        </item>
+        <item>
+         <layout class="QVBoxLayout" name="verticalLayout_5">
+          <item>
+           <widget class="QPushButton" name="addInputLineButton">
+            <property name="text">
+             <string>添加一行</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="deleteRowsButton">
+            <property name="text">
+             <string>删除行</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="clearInputListButton">
+            <property name="text">
+             <string>清空列表</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="inputFromFileButton">
+            <property name="text">
+             <string>文件导入</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="verticalSpacer_2">
+            <property name="orientation">
+             <enum>Qt::Vertical</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>20</width>
+              <height>40</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="tab_3">
+       <attribute name="title">
+        <string>输出结果</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_7">
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_4">
+          <item>
+           <spacer name="horizontalSpacer_2">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QPushButton" name="exportResultButton">
+            <property name="text">
+             <string>导出</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QTableWidget" name="resultTable"/>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="tab_2">
+       <attribute name="title">
+        <string>代理设置</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_6">
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_5">
+          <item>
+           <widget class="QLabel" name="label_2">
+            <property name="font">
+             <font>
+              <family>方正黑体简体</family>
+              <pointsize>11</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>代理设置</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="horizontalSpacer_3">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="useProxyCheckBox">
+            <property name="text">
+             <string>启用代理</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="connectProxyButton">
+            <property name="text">
+             <string>测试代理</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="Line" name="line">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="ifProxyUseHttpsCheckBox">
+          <property name="text">
+           <string>代理服务器使用https</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <layout class="QGridLayout" name="gridLayout">
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_3">
+            <property name="text">
+             <string>代理服务器IP</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QLineEdit" name="proxyIpLineEdit"/>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_4">
+            <property name="text">
+             <string>代理服务器端口</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QLineEdit" name="proxyPortLineEdit"/>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <spacer name="verticalSpacer_3">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>40</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_6">
+          <item>
+           <spacer name="horizontalSpacer">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QPushButton" name="proxySaveButton">
+            <property name="text">
+             <string>保存设置</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+    <item>
+     <widget class="QTextEdit" name="logTextEdit">
+      <property name="font">
+       <font>
+        <family>Arial</family>
+        <pointsize>10</pointsize>
+       </font>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>addCharIdenButton</sender>
+   <signal>clicked()</signal>
+   <receiver>mainForm</receiver>
+   <slot>addCharIden()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>734</x>
+     <y>86</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>796</x>
+     <y>289</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>clearCharIdenButton</sender>
+   <signal>clicked()</signal>
+   <receiver>mainForm</receiver>
+   <slot>clearCharIden()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>775</x>
+     <y>118</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>801</x>
+     <y>244</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>useProxyCheckBox</sender>
+   <signal>stateChanged(int)</signal>
+   <receiver>mainForm</receiver>
+   <slot>updateProxyUiStatus()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>695</x>
+     <y>58</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>797</x>
+     <y>146</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>proxySaveButton</sender>
+   <signal>clicked()</signal>
+   <receiver>mainForm</receiver>
+   <slot>saveProxy()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>776</x>
+     <y>274</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>798</x>
+     <y>318</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>connectProxyButton</sender>
+   <signal>clicked()</signal>
+   <receiver>mainForm</receiver>
+   <slot>connectProxy()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>776</x>
+     <y>62</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>797</x>
+     <y>103</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>startAnaResponseButton</sender>
+   <signal>clicked()</signal>
+   <receiver>mainForm</receiver>
+   <slot>requestAndAnaJson()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>775</x>
+     <y>147</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>795</x>
+     <y>204</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>addInputLineButton</sender>
+   <signal>clicked()</signal>
+   <receiver>mainForm</receiver>
+   <slot>addInputListRow()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>776</x>
+     <y>62</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>804</x>
+     <y>190</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>clearInputListButton</sender>
+   <signal>clicked()</signal>
+   <receiver>mainForm</receiver>
+   <slot>clearInputList()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>776</x>
+     <y>120</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>796</x>
+     <y>129</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>inputFromFileButton</sender>
+   <signal>clicked()</signal>
+   <receiver>mainForm</receiver>
+   <slot>loadInputFromFile()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>726</x>
+     <y>132</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>793</x>
+     <y>96</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>startSendButton</sender>
+   <signal>clicked()</signal>
+   <receiver>mainForm</receiver>
+   <slot>sendPacketUseInput()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>775</x>
+     <y>176</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>801</x>
+     <y>393</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>deleteRowsButton</sender>
+   <signal>clicked()</signal>
+   <receiver>mainForm</receiver>
+   <slot>deleteInputListRows()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>762</x>
+     <y>79</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>795</x>
+     <y>235</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>exportResultButton</sender>
+   <signal>clicked()</signal>
+   <receiver>mainForm</receiver>
+   <slot>exportResultTable()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>759</x>
+     <y>52</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>800</x>
+     <y>270</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+ <slots>
+  <slot>addCharIden()</slot>
+  <slot>clearCharIden()</slot>
+  <slot>updateProxyUiStatus()</slot>
+  <slot>saveProxy()</slot>
+  <slot>connectProxy()</slot>
+  <slot>requestAndAnaJson()</slot>
+  <slot>addInputListRow()</slot>
+  <slot>clearInputList()</slot>
+  <slot>loadInputFromFile()</slot>
+  <slot>sendPacketUseInput()</slot>
+  <slot>deleteInputListRows()</slot>
+  <slot>exportResultTable()</slot>
+ </slots>
+</ui>
