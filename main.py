@@ -9,6 +9,7 @@ import traceback
 import warnings
 from queue import Queue
 
+import openpyxl as oxl
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import Qt, QDir
 from PyQt5.QtGui import QTextCursor
@@ -19,8 +20,6 @@ from ConnectProxy import ConnectProxy
 from requestThread import RequestThread
 from ui.mainForm import Ui_mainForm
 
-import openpyxl as oxl
-
 
 class Main(QMainWindow, Ui_mainForm):
     ### 全局方法
@@ -28,6 +27,9 @@ class Main(QMainWindow, Ui_mainForm):
         super(Main, self).__init__()
         self.setupUi(self)
         self.charIde = "¿"
+        self.responseTypeList = []
+        self.responseTypeList.append({"name": "普通JSON类型", "key": "normal", "note": "{\"a\":123}"})
+        self.responseTypeList.append({"name": "JSON字符串", "key": "jsonStr", "note": "\"{\\\"a\\\":123}\""})
         self.connectProxyThread = None
         warnings.filterwarnings("ignore")
         self.confFileName = "工具配置.conf"
@@ -37,6 +39,7 @@ class Main(QMainWindow, Ui_mainForm):
         self.createInputTabWidget(1)
         self.tableWidget_index1.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.resultTableHeaderBase = ["输入值", "响应码", "请求结果"]
+        self.createResponseTypeComboBox()
         # 开启网络请求线程
         self.anaJsonReqThread = RequestThread()
         self.anaJsonReqThread.signal_result.connect(self.doAnaJsonResponse)
@@ -44,6 +47,10 @@ class Main(QMainWindow, Ui_mainForm):
         self.getResponseReqThread.signal_result.connect(self.doAddResponseToResult)
         self.anaJsonReqThread.start()
         self.getResponseReqThread.start()
+
+    def createResponseTypeComboBox(self):
+        for tmpIndex, tmpResponseTypeDic in enumerate(self.responseTypeList):
+            self.responseTypeComboBox.addItem(tmpResponseTypeDic["name"])
 
     # 写日志，logType：0代表普通日志，1代表警告日志（如输入错误等）,2代表异常日志
     def writeLog(self, logStr, logType=0):
@@ -393,7 +400,24 @@ class Main(QMainWindow, Ui_mainForm):
             self.writeLog(warningStr, 2)
             return False
 
+    def responseTypeChange(self, nowIndex):
+        nowNote = self.responseTypeList[nowIndex]["note"]
+        self.responseTypeExample.setText("示例：" + nowNote)
+
     ### 返回值解析界面方法
+    def anaResponseByResponseType(self, responseContent):
+        nowSelectIndex = self.responseTypeComboBox.currentIndex()
+        nowResponseTypeDic = self.responseTypeList[nowSelectIndex]
+        nowKey = nowResponseTypeDic["key"]
+
+        if nowKey == "normal":
+            pass
+        elif nowKey == "jsonStr":
+            responseContent = json.loads(responseContent)
+        else:
+            pass
+        return responseContent
+
     def doAnaJsonResponse(self, resultDic):
         inputDic = resultDic["input"]
         repDic = resultDic["result"]
@@ -410,6 +434,7 @@ class Main(QMainWindow, Ui_mainForm):
                 self.startSendButton.setEnabled(False)
             else:
                 repContent = repDic["pageContent"]
+                repContent = self.anaResponseByResponseType(repContent)
                 anaResultStr, anaJsonDic = myUtils.anaJson(repContent)
                 if anaResultStr != "":
                     warningStr = "解析当前报文失败，错误信息为：{}".format(anaResultStr)
@@ -555,12 +580,12 @@ class Main(QMainWindow, Ui_mainForm):
             for selectDic in selectList:
                 nowStruct = selectDic["struct"]
                 nowResultCol = resultDic[nowStruct]
-                if len(nowResultCol)>maxRowCount:
-                    maxRowCount=len(nowResultCol)
+                if len(nowResultCol) > maxRowCount:
+                    maxRowCount = len(nowResultCol)
                 resultColList.append(copy.deepcopy(nowResultCol))
         else:
             maxRowCount = 1
-            resultColList=[[None]*len(selectList)]
+            resultColList = [[None] * len(selectList)]
 
         # 写入表格
         nowTable = self.resultTable
@@ -571,7 +596,8 @@ class Main(QMainWindow, Ui_mainForm):
             nowTable.setItem(nowRowCount, 1, myUtils.createTableItem(repStatus))
             nowTable.setItem(nowRowCount, 2, myUtils.createTableItem(reqResultStr))
             for tmpIndex in range(len(selectList)):
-                nowTable.setItem(nowRowCount, 3 + tmpIndex, myUtils.createTableItem(resultColList[tmpIndex][nowRowIndex]))
+                nowTable.setItem(nowRowCount, 3 + tmpIndex,
+                                 myUtils.createTableItem(resultColList[tmpIndex][nowRowIndex]))
 
         if ifEnd:
             warningStr = "已完成所有请求，请求结果请查看[输出结果]页面"
