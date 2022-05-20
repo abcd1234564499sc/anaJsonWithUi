@@ -16,6 +16,7 @@ from PyQt5.QtGui import QTextCursor
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTreeWidgetItem, QHeaderView, QFileDialog
 
 import myUtils
+from AnaJsonThread import AnaJsonThread
 from ConnectProxy import ConnectProxy
 from requestThread import RequestThread
 from ui.mainForm import Ui_mainForm
@@ -45,6 +46,8 @@ class Main(QMainWindow, Ui_mainForm):
         self.anaJsonReqThread.signal_result.connect(self.doAnaJsonResponse)
         self.getResponseReqThread = RequestThread()
         self.getResponseReqThread.signal_result.connect(self.doAddResponseToResult)
+        self.anaJsonThread = AnaJsonThread()
+        self.anaJsonThread.signal_result.connect(self.sendReuqestUseJsonArg)
         self.anaJsonReqThread.start()
         self.getResponseReqThread.start()
 
@@ -319,7 +322,16 @@ class Main(QMainWindow, Ui_mainForm):
             return
         else:
             pass
+        self.anaJsonThread.setSelectDicList(selectDicList)
+        self.anaJsonThread.start()
+        warningStr = "正在根据勾选项进行分析"
+        self.writeLog(warningStr)
+        warningStr = "若勾选项过多，可能会耗费一段时间，请耐心等待"
+        self.writeLog(warningStr)
 
+    def sendReuqestUseJsonArg(self, jsonArgList):
+        warningStr = "勾选项分析完成，根据勾选项共会产生{}条结果".format(len(jsonArgList) - 1)
+        self.writeLog(warningStr)
         # 获取报文
         nowPacketStr = self.packetTextEdit.toPlainText()
         charIdeCount = nowPacketStr.count(self.charIde)
@@ -370,7 +382,7 @@ class Main(QMainWindow, Ui_mainForm):
             ifAddFlag, nowCoordinate = myUtils.coordinatePlus(nowCoordinate, maxCoordinate)
         # 开始请求
         # 构建输出结果表格
-        tmpTableHeader = self.resultTableHeaderBase + [tmpDic["name"] for tmpDic in selectDicList]
+        tmpTableHeader = self.resultTableHeaderBase + [headerName for headerName in jsonArgList[0]]
         self.resultTable.setColumnCount(len(tmpTableHeader))
         self.resultTable.setHorizontalHeaderLabels(tmpTableHeader)
         self.resultTable.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
@@ -391,7 +403,7 @@ class Main(QMainWindow, Ui_mainForm):
                 nowUrl = "{0}://{1}{2}".format(nowPro, nowPacketDic["host"], nowPacketDic["uri"])
                 extraDic = {"input": nowPacketInputListStr,
                             "ifEnd": True if tmpPacketIndex == len(packetUseInputList) - 1 else False,
-                            "selectDicList": selectDicList}
+                            "jsonArgList": jsonArgList}
                 self.getResponseReqThread.addUrl(nowUrl, cookie=nowPacketDic["cookie"], header=nowPacketDic["header"],
                                                  data=nowPacketDic["data"], type=nowPacketDic["requestType"],
                                                  proxies=self.proxies, extraData=extraDic)
@@ -457,7 +469,7 @@ class Main(QMainWindow, Ui_mainForm):
         while not keyQueue.empty():
             tmpKeyItem = keyQueue.get()
             if type(tmpKeyItem["key"]) != int:
-                nowLocDic = {"value": tmpKeyItem["key"], "type": 0}  # 0表示值（包括值和字典类型）,1表示数组
+                nowLocDic = {"value": tmpKeyItem["key"], "type": 0, "listCount": 0}  # 0表示值（包括值和字典类型）,1表示数组
                 nowLoaction = copy.deepcopy(tmpKeyItem["location"])
                 nowLoaction.append(nowLocDic)
                 tmpTreeItem = QTreeWidgetItem(tmpKeyItem["parent"])
@@ -478,6 +490,7 @@ class Main(QMainWindow, Ui_mainForm):
                 nowListCount = tmpKeyItem["key"]
                 nowLoaction = tmpKeyItem["location"]
                 nowLoaction[-1]["type"] = 1
+                nowLoaction[-1]["listCount"] = nowListCount
                 nowParentObj = tmpKeyItem["parent"]
                 nowParentObj.setText(2, "数组[长度为{}]".format(nowListCount))
                 nowParentObj.setText(3, json.dumps(nowLoaction))
@@ -571,33 +584,39 @@ class Main(QMainWindow, Ui_mainForm):
         reqFlag = repDic["checkFlag"]
         nowInput = dataDic["input"]
         ifEnd = dataDic["ifEnd"]
-        selectList = dataDic["selectDicList"]
+        jsonArgList = dataDic["jsonArgList"]
         reqResultStr = "成功" if reqFlag else repDic["resultStr"]
         if reqFlag:
-            resultColList = []
-            resultDic = myUtils.getJsonResultList(repDic["pageContent"])
-            maxRowCount = 0
-            for selectDic in selectList:
-                nowStruct = selectDic["struct"]
-                nowResultCol = resultDic[nowStruct]
-                if len(nowResultCol) > maxRowCount:
-                    maxRowCount = len(nowResultCol)
-                resultColList.append(copy.deepcopy(nowResultCol))
+            resultRowList = []
+            pageContent = repDic["pageContent"]
+            pageContent = self.anaResponseByResponseType(pageContent)
+            pageJsonDic = json.loads(pageContent)
+            for nowRowIndex, nowRowData in enumerate(jsonArgList):
+                if nowRowIndex == 0:
+                    continue
+                resultRowList.append([])
+                for nowColIndex, nowColData in enumerate(nowRowData):
+                    nowJsonArg = nowColData
+                    try:
+                        evalText = "pageJsonDic" + nowJsonArg
+                        nowVal = eval(evalText)
+                    except:
+                        nowVal = "None"
+                    resultRowList[nowRowIndex - 1].append(nowVal)
         else:
             maxRowCount = 1
-            resultColList = [[None] * len(selectList)]
-
+            resultRowList = [["None" * len(jsonArgList[0])]]
         # 写入表格
         nowTable = self.resultTable
-        for nowRowIndex in range(maxRowCount):
+        for nowRowIndex, nowRowList in enumerate(resultRowList):
             nowRowCount = nowTable.rowCount()
             nowTable.insertRow(nowRowCount)
             nowTable.setItem(nowRowCount, 0, myUtils.createTableItem(nowInput))
             nowTable.setItem(nowRowCount, 1, myUtils.createTableItem(repStatus))
             nowTable.setItem(nowRowCount, 2, myUtils.createTableItem(reqResultStr))
-            for tmpIndex in range(len(selectList)):
+            for tmpIndex in range(len(nowRowList)):
                 nowTable.setItem(nowRowCount, 3 + tmpIndex,
-                                 myUtils.createTableItem(resultColList[tmpIndex][nowRowIndex]))
+                                 myUtils.createTableItem(nowRowList[tmpIndex]))
 
         if ifEnd:
             warningStr = "已完成所有请求，请求结果请查看[输出结果]页面"

@@ -4,17 +4,15 @@ import copy
 import datetime
 import json
 import os
-
 import re
 import socket
 import traceback
 from queue import Queue
 
+import openpyxl as oxl
 import requests
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QTableWidgetItem
-import openpyxl as oxl
-
 # 全局变量区域
 from openpyxl.styles import Border, Side, Font, PatternFill
 
@@ -626,33 +624,41 @@ def getJsonResultList(jsonContent):
             nowListCount = tmpKeyItem["key"]
             nowLoaction = tmpKeyItem["location"]
             nowResultLocation = tmpKeyItem["resultLoc"]
-            # 修改resultList
-            tmpResultList = [[]]
-            for tmpIndex, tmpKey in enumerate(resultList[0]):
-                for tmpAddIndex in range(nowListCount):
-                    nowHeader = tmpKey + "[{}]".format(str(tmpAddIndex))
-                    # 修改表头
-                    tmpResultList[0].append(nowHeader)
-                    # 修改数据
-                    tmpDataList = copy.deepcopy(resultList[tmpIndex+1])
-                    tmpDataList[0] = nowHeader
-                    tmpResultList.append(tmpDataList)
-            resultList = copy.deepcopy(tmpResultList)
-            nowJsonVal = tmpKeyItem["jsonValue"]
-            # 将数组中的元素加入队列
-            for tmpKey in tmpKeyItem["value"].keys():
-                for tmpIndex in range(nowListCount):
-                    tmpResultLocation = nowResultLocation + "[{}]".format(str(tmpIndex))
-                    tmpItem = {"key": tmpKey, "parent": tmpKeyItem["parent"], "value": tmpKeyItem["value"][tmpKey],
-                               "location": nowLoaction, "resultLoc": tmpResultLocation,
-                               "jsonValue": nowJsonVal[tmpIndex]}
-                    keyQueue.put(tmpItem)
+            if nowListCount != 0:
+                # 修改resultList
+                tmpResultList = [[]]
+                for tmpIndex, tmpKey in enumerate(resultList[0]):
+                    for tmpAddIndex in range(nowListCount):
+                        nowHeader = tmpKey + "[{}]".format(str(tmpAddIndex))
+                        # 修改表头
+                        tmpResultList[0].append(nowHeader)
+                        # 修改数据
+                        tmpDataList = copy.deepcopy(resultList[tmpIndex + 1])
+                        tmpDataList[0] = nowHeader
+                        tmpResultList.append(tmpDataList)
+                resultList = copy.deepcopy(tmpResultList)
+                nowJsonVal = tmpKeyItem["jsonValue"] if type(tmpKeyItem["jsonValue"]) == list else []
+                # 将数组中的元素加入队列
+                for tmpKey in tmpKeyItem["value"].keys():
+                    for tmpIndex in range(len(nowJsonVal)):
+                        tmpResultLocation = nowResultLocation + "[{}]".format(str(tmpIndex))
+                        tmpJsonVal = nowJsonVal[tmpIndex]
+                        tmpValue = tmpKeyItem["value"][tmpKey]
+                        if tmpKey not in tmpJsonVal.keys():
+                            tmpJsonVal.update({tmpKey: "None"})
+                            tmpValue = {}
+                        tmpItem = {"key": tmpKey, "parent": tmpKeyItem["parent"], "value": tmpValue,
+                                   "location": nowLoaction, "resultLoc": tmpResultLocation,
+                                   "jsonValue": tmpJsonVal}
+                        keyQueue.put(tmpItem)
+            else:
+                pass
 
     # 处理返回结果
     reResultDic = {}
-    for index in range(1,len(resultList)):
+    for index in range(1, len(resultList)):
         nowResultItem = resultList[index]
-        for tmpIndex in range(1,len(nowResultItem)):
+        for tmpIndex in range(1, len(nowResultItem)):
             nowTmpResultDic = nowResultItem[tmpIndex]
             nowResultVal = nowTmpResultDic["jsonValue"]
             nowLoc = nowTmpResultDic["location"]
@@ -660,5 +666,20 @@ def getJsonResultList(jsonContent):
             if nowLocStr in reResultDic.keys():
                 reResultDic[nowLocStr].append(nowResultVal)
             else:
-                reResultDic[nowLocStr]=[nowResultVal]
+                reResultDic[nowLocStr] = [nowResultVal]
     return reResultDic
+
+def ifTowListHasSameItem(list1,list2):
+    reFlag = False
+    for item1 in list1:
+        for item2 in list2:
+            if item1 == item2:
+                reFlag = True
+                break
+            else:
+                pass
+        if reFlag:
+            break
+        else:
+            pass
+    return reFlag

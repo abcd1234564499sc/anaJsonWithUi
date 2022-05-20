@@ -26,17 +26,51 @@
        </attribute>
        <layout class="QVBoxLayout" name="verticalLayout">
         <item>
-         <widget class="QCheckBox" name="ifPacketUseHttpsCheckBox">
-          <property name="font">
-           <font>
-            <family>Arial</family>
-            <pointsize>10</pointsize>
-           </font>
-          </property>
-          <property name="text">
-           <string>使用Https</string>
-          </property>
-         </widget>
+         <layout class="QHBoxLayout" name="horizontalLayout_7" stretch="5,0,0,2,3">
+          <item>
+           <widget class="QCheckBox" name="ifPacketUseHttpsCheckBox">
+            <property name="font">
+             <font>
+              <family>Arial</family>
+              <pointsize>10</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>使用Https</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="horizontalSpacer_4">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QLabel" name="label">
+            <property name="text">
+             <string>返回值类型</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QComboBox" name="responseTypeComboBox"/>
+          </item>
+          <item>
+           <widget class="QLabel" name="responseTypeExample">
+            <property name="text">
+             <string>示例：</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
         </item>
         <item>
          <layout class="QHBoxLayout" name="horizontalLayout">
@@ -440,8 +474,8 @@ p, li { white-space: pre-wrap; }
    <slot>updateProxyUiStatus()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>695</x>
-     <y>58</y>
+     <x>677</x>
+     <y>65</y>
     </hint>
     <hint type="destinationlabel">
      <x>797</x>
@@ -536,8 +570,8 @@ p, li { white-space: pre-wrap; }
    <slot>loadInputFromFile()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>726</x>
-     <y>132</y>
+     <x>776</x>
+     <y>172</y>
     </hint>
     <hint type="destinationlabel">
      <x>793</x>
@@ -553,7 +587,7 @@ p, li { white-space: pre-wrap; }
    <hints>
     <hint type="sourcelabel">
      <x>775</x>
-     <y>176</y>
+     <y>204</y>
     </hint>
     <hint type="destinationlabel">
      <x>801</x>
@@ -593,6 +627,22 @@ p, li { white-space: pre-wrap; }
     </hint>
    </hints>
   </connection>
+  <connection>
+   <sender>responseTypeComboBox</sender>
+   <signal>currentIndexChanged(int)</signal>
+   <receiver>mainForm</receiver>
+   <slot>responseTypeChange()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>537</x>
+     <y>52</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>795</x>
+     <y>56</y>
+    </hint>
+   </hints>
+  </connection>
  </connections>
  <slots>
   <slot>addCharIden()</slot>
@@ -607,5 +657,6 @@ p, li { white-space: pre-wrap; }
   <slot>sendPacketUseInput()</slot>
   <slot>deleteInputListRows()</slot>
   <slot>exportResultTable()</slot>
+  <slot>responseTypeChange()</slot>
  </slots>
 </ui>
