@@ -57,7 +57,8 @@ class AnaJsonThread(QThread):
                     # 构建新的结果数组
                     newSelectDicJsonArgList = []
                     for tmpJsonArg in nowSelectDicJsonArgList:
-                        tmpJsonArg["value"] = tmpJsonArg["value"] + '["{}"]'.format(nowStructValue)
+                        if nowStructValue != "":
+                            tmpJsonArg["value"] = tmpJsonArg["value"] + '["{}"]'.format(nowStructValue)
                         for tmpIndex in range(nowListCount):
                             newJsonArg = copy.deepcopy(tmpJsonArg)
                             newJsonArg["value"] = newJsonArg["value"] + "[{}]".format(tmpIndex)

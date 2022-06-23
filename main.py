@@ -489,11 +489,22 @@ class Main(QMainWindow, Ui_mainForm):
                 # 处理数组的情况
                 nowListCount = tmpKeyItem["key"]
                 nowLoaction = tmpKeyItem["location"]
-                nowLoaction[-1]["type"] = 1
-                nowLoaction[-1]["listCount"] = nowListCount
-                nowParentObj = tmpKeyItem["parent"]
-                nowParentObj.setText(2, "数组[长度为{}]".format(nowListCount))
-                nowParentObj.setText(3, json.dumps(nowLoaction))
+                if len(nowLoaction) != 0:
+                    nowLoaction[-1]["type"] = 1
+                    nowLoaction[-1]["listCount"] = nowListCount
+                    nowParentObj = tmpKeyItem["parent"]
+                    nowParentObj.setText(2, "数组[长度为{}]".format(nowListCount))
+                    nowParentObj.setText(3, json.dumps(nowLoaction))
+                else:
+                    # 根节点就是数组
+                    tmpTreeItem = QTreeWidgetItem(tmpKeyItem["parent"])
+                    tmpTreeItem.setText(2, "数组[长度为{}]".format(nowListCount))
+                    tmpTreeItem.setText(1, "根节点")
+                    tmpTreeItem.setText(3, json.dumps(nowLoaction))
+                    tmpKeyItem["parent"] = tmpTreeItem
+                    nowLocDic = {"value": "", "type": 1, "listCount": nowListCount}  # 0表示值（包括值和字典类型）,1表示数组
+                    nowLoaction.append(nowLocDic)
+
                 for tmpKey in tmpKeyItem["value"].keys():
                     tmpItem = {"key": tmpKey, "parent": tmpKeyItem["parent"], "value": tmpKeyItem["value"][tmpKey],
                                "location": nowLoaction}
