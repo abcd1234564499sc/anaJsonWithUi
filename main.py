@@ -3,6 +3,7 @@
 import copy
 import json
 import os
+import queue
 import re
 import sys
 import traceback
@@ -18,6 +19,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QTreeWidgetItem, QHeaderV
 import myUtils
 from AnaJsonThread import AnaJsonThread
 from ConnectProxy import ConnectProxy
+from ExportExcellThread import ExportExcellThread
 from requestThread import RequestThread
 from ui.mainForm import Ui_mainForm
 
@@ -34,9 +36,9 @@ class Main(QMainWindow, Ui_mainForm):
         self.connectProxyThread = None
         warnings.filterwarnings("ignore")
         self.confFileName = "工具配置.conf"
-        self.confHeadList = ["是否使用代理", "代理IP", "代理端口", "代理服务器使用Https"]
+        self.confHeadList = ["是否使用代理", "代理IP", "代理端口", "代理服务器使用Https", "单次导出数据条数"]
         self.responseAnaResultTreeWidget.hideColumn(3)
-        self.initConfFile()
+        self.confDic = self.initConfFile()
         self.createInputTabWidget(1)
         self.tableWidget_index1.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.resultTableHeaderBase = ["输入值", "响应码", "请求结果"]
@@ -50,6 +52,7 @@ class Main(QMainWindow, Ui_mainForm):
         self.anaJsonThread.signal_result.connect(self.sendReuqestUseJsonArg)
         self.anaJsonReqThread.start()
         self.getResponseReqThread.start()
+        self.exportExcellThread = None
 
     def createResponseTypeComboBox(self):
         for tmpIndex, tmpResponseTypeDic in enumerate(self.responseTypeList):
@@ -90,9 +93,11 @@ class Main(QMainWindow, Ui_mainForm):
         defaultProxyIp = ""
         defaultProxyPort = ""
         defaultIfProxyUseHttps = 0
+        defaultExportCount = 10000
         defaultConfHeaderList = self.confHeadList
         confDic = {defaultConfHeaderList[0]: defaultIfProxy, defaultConfHeaderList[1]: defaultProxyIp,
-                   defaultConfHeaderList[2]: defaultProxyPort, defaultConfHeaderList[3]: defaultIfProxyUseHttps}
+                   defaultConfHeaderList[2]: defaultProxyPort, defaultConfHeaderList[3]: defaultIfProxyUseHttps,
+                   defaultConfHeaderList[4]: defaultExportCount}
 
         # 判断是否存在配置文件
         confFilePath = os.path.join(os.getcwd(), self.confFileName)
@@ -106,7 +111,8 @@ class Main(QMainWindow, Ui_mainForm):
         reConfDic = {"confFilePath": confFilePath, "confHeaderList": headerList,
                      "ifProxy": True if int(confDic[headerList[0]]) == 1 else False,
                      "proxyIp": confDic[headerList[1]], "proxyPort": confDic[headerList[2]],
-                     "ifProxyUseHttps": True if int(confDic[headerList[3]]) == 1 else False}
+                     "ifProxyUseHttps": True if int(confDic[headerList[3]]) == 1 else False,
+                     "exportSaveCount": int(confDic[headerList[4]])}
 
         # 更新代理设置
         self.proxies = self.updateProxy(reConfDic)
@@ -139,11 +145,23 @@ class Main(QMainWindow, Ui_mainForm):
 
         # 生成字典
         confDic = {self.confHeadList[0]: 1 if nowProxyCheckStatus else 0, self.confHeadList[1]: nowProxyIp,
-                   self.confHeadList[2]: nowProxyPort, self.confHeadList[3]: 1 if nowIfProxyUseHttps else 0}
+                   self.confHeadList[2]: nowProxyPort, self.confHeadList[3]: 1 if nowIfProxyUseHttps else 0,
+                   self.confHeadList[4]: int(self.confDic[self.headerList[4]])}
 
         # 保存到配置文件
         confFilePath = os.path.join(os.getcwd(), self.confFileName)
         myUtils.writeToConfFile(confFilePath, confDic)
+
+        # 更新当前配置
+        headerList = self.confHeadList
+        self.confDic = {"confFilePath": confFilePath, "confHeaderList": headerList,
+                        "ifProxy": True if int(confDic[headerList[0]]) == 1 else False,
+                        "proxyIp": confDic[headerList[1]], "proxyPort": confDic[headerList[2]],
+                        "ifProxyUseHttps": True if int(confDic[headerList[3]]) == 1 else False,
+                        "exportSaveCount": int(confDic[headerList[4]])}
+        # 更新代理设置
+        self.proxies = self.updateProxy(self.confDic)
+
         warningStr = "成功保存代理设置"
         self.writeLog(warningStr, 0)
 
@@ -312,7 +330,7 @@ class Main(QMainWindow, Ui_mainForm):
             tmpDic["name"] = nowName
             tmpDic["struct"] = nowStrcut
             tmpDic["checkStatus"] = nowCheckStatus
-            if nowCheckStatus != 0:
+            if nowCheckStatus != 0 and nowStrcut != "":
                 selectDicList.append(tmpDic)
             else:
                 continue
@@ -458,8 +476,9 @@ class Main(QMainWindow, Ui_mainForm):
                     self.writeLog(warningStr, 0)
                     self.startSendButton.setEnabled(True)
 
-    # 根据传入的json结构树字典构建一个treewidget，其中末尾节点带一个复选框
+    # 根据传入的json结构树字典构建一个treewidget，每个节点带一个复选框
     def createTreeWidgetFromJsonTree(self, treeDic):
+        self.responseAnaResultTreeWidget.itemChanged['QTreeWidgetItem*', 'int'].disconnect()
         self.responseAnaResultTreeWidget.clear()
         keyQueue = Queue()
         for tmpKey in treeDic.keys():
@@ -494,7 +513,7 @@ class Main(QMainWindow, Ui_mainForm):
                     nowLoaction[-1]["listCount"] = nowListCount
                     nowParentObj = tmpKeyItem["parent"]
                     nowParentObj.setText(2, "数组[长度为{}]".format(nowListCount))
-                    nowParentObj.setText(3, json.dumps(nowLoaction))
+                    nowParentObj.setText(3, "")
                 else:
                     # 根节点就是数组
                     tmpTreeItem = QTreeWidgetItem(tmpKeyItem["parent"])
@@ -509,6 +528,53 @@ class Main(QMainWindow, Ui_mainForm):
                     tmpItem = {"key": tmpKey, "parent": tmpKeyItem["parent"], "value": tmpKeyItem["value"][tmpKey],
                                "location": nowLoaction}
                     keyQueue.put(tmpItem)
+        self.responseAnaResultTreeWidget.itemChanged['QTreeWidgetItem*', 'int'].connect(
+            self.responseAnaResultTreeWidgetCheckboxChanged)
+
+    def responseAnaResultTreeWidgetCheckboxChanged(self, changeItem, colIndex):
+        self.responseAnaResultTreeWidget.itemChanged['QTreeWidgetItem*', 'int'].disconnect()
+        childQueue = queue.Queue()
+        parentQueue = queue.Queue()
+        # 判断当前的选中状态
+        nowCheckState = changeItem.checkState(colIndex)
+        childQueue.put(changeItem)
+        parentQueue.put(changeItem)
+        # 处理子节点
+        while not childQueue.empty():
+            tmpItem = childQueue.get()
+            tmpCheckState = tmpItem.checkState(colIndex)
+            # 将所有子节点设置为相同状态
+            nowChildCount = tmpItem.childCount()
+            for index in range(nowChildCount):
+                tmpChildItem = tmpItem.child(index)
+                tmpChildItem.setCheckState(colIndex, nowCheckState)
+                childQueue.put(tmpChildItem)
+        # 处理父节点
+        while not parentQueue.empty():
+            tmpItem = parentQueue.get()
+            # 获取当前节点的父节点
+            tmpParentItem = tmpItem.parent()
+            if tmpParentItem is None:
+                continue
+            else:
+                # 读取所有父节点的子节点，判断父节点的选中状态
+                parentCheckStatus = 0
+                tmpChildCount = tmpParentItem.childCount()
+                tmpSum = 0
+                for index in range(tmpChildCount):
+                    tmpChildItem = tmpParentItem.child(index)
+                    tmpSum = tmpSum + tmpChildItem.checkState(colIndex)
+                tmpAvg = tmpSum / tmpChildCount
+                if tmpAvg == 0:
+                    parentCheckStatus = 0
+                elif tmpAvg == 2:
+                    parentCheckStatus = 2
+                else:
+                    parentCheckStatus = 1
+                tmpParentItem.setCheckState(colIndex, parentCheckStatus)
+                parentQueue.put(tmpParentItem)
+        self.responseAnaResultTreeWidget.itemChanged['QTreeWidgetItem*', 'int'].connect(
+            self.responseAnaResultTreeWidgetCheckboxChanged)
 
     ### 输入设置界面方法
     def createInputTabWidget(self, needTabCount):
@@ -634,43 +700,27 @@ class Main(QMainWindow, Ui_mainForm):
             self.writeLog(warningStr, 0)
 
     def exportResultTable(self):
-        nowTable = self.resultTable
+        exportSaveCount = int(self.confDic["exportSaveCount"])
 
+        nowTable = self.resultTable
         nowRowCount = nowTable.rowCount()
-        nowColCount = nowTable.columnCount()
-        nowHeader = [nowTable.horizontalHeaderItem(index).text() for index in range(nowColCount)]
-        nowHeader = ["序号"] + nowHeader
         if nowRowCount == 0:
             self.writeLog("当前无可导出数据", 1)
             return
-        filename = "导出文件 " + myUtils.getNowSeconed()
-        filename = myUtils.updateFileNameStr(filename)
-        # 创建一个excell文件对象
-        wb = oxl.Workbook()
-        # 创建URL扫描结果子表
-        ws = wb.active
-        ws.title = "JSON返回值请求结果"
-        # 创建表头
-        myUtils.writeExcellHead(ws, nowHeader)
 
-        # 遍历当前结果
-        for rowIndex in range(nowRowCount):
-            myUtils.writeExcellCell(ws, rowIndex + 2, 1, str(rowIndex + 1), 0, True)
-            for colIndex in range(nowColCount):
-                nowItemText = nowTable.item(rowIndex, colIndex).text()
+        self.exportExcellThread = ExportExcellThread(nowTable, exportSaveCount)
+        self.exportExcellThread.signal_end.connect(self.exportCompleted)
+        self.exportExcellThread.signal_log.connect(self.writeLog)
+        self.exportExcellThread.start()
+        self.writeLog("开始导出文件")
+        self.exportResultButton.setEnabled(False)
 
-                # 将值写入excell对象
-                myUtils.writeExcellCell(ws, rowIndex + 2, colIndex + 2, nowItemText, 0, True)
-            myUtils.writeExcellSpaceCell(ws, rowIndex + 2, nowColCount + 2)
-
-        # 设置列宽
-        colWidthArr = [7, 20, 10, 20]
-        for colIndex in range(nowColCount):
-            colWidthArr.append(30)
-        myUtils.setExcellColWidth(ws, colWidthArr)
-        # 保存文件
-        myUtils.saveExcell(wb, saveName=filename)
-        self.writeLog("成功保存文件：{0}.xlsx 至当前文件夹".format(filename), 0)
+    def exportCompleted(self, result, logStr):
+        if result:
+            self.writeLog(logStr)
+        else:
+            self.writeLog(logStr, 1)
+        self.exportResultButton.setEnabled(True)
 
 
 if __name__ == "__main__":

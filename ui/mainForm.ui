@@ -474,8 +474,8 @@ p, li { white-space: pre-wrap; }
    <slot>updateProxyUiStatus()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>677</x>
-     <y>65</y>
+     <x>695</x>
+     <y>58</y>
     </hint>
     <hint type="destinationlabel">
      <x>797</x>
@@ -571,7 +571,7 @@ p, li { white-space: pre-wrap; }
    <hints>
     <hint type="sourcelabel">
      <x>776</x>
-     <y>172</y>
+     <y>149</y>
     </hint>
     <hint type="destinationlabel">
      <x>793</x>
@@ -587,7 +587,7 @@ p, li { white-space: pre-wrap; }
    <hints>
     <hint type="sourcelabel">
      <x>775</x>
-     <y>204</y>
+     <y>178</y>
     </hint>
     <hint type="destinationlabel">
      <x>801</x>
@@ -643,6 +643,22 @@ p, li { white-space: pre-wrap; }
     </hint>
    </hints>
   </connection>
+  <connection>
+   <sender>responseAnaResultTreeWidget</sender>
+   <signal>itemChanged(QTreeWidgetItem*,int)</signal>
+   <receiver>mainForm</receiver>
+   <slot>responseAnaResultTreeWidgetCheckboxChanged()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>643</x>
+     <y>193</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>788</x>
+     <y>-3</y>
+    </hint>
+   </hints>
+  </connection>
  </connections>
  <slots>
   <slot>addCharIden()</slot>
@@ -658,5 +674,6 @@ p, li { white-space: pre-wrap; }
   <slot>deleteInputListRows()</slot>
   <slot>exportResultTable()</slot>
   <slot>responseTypeChange()</slot>
+  <slot>responseAnaResultTreeWidgetCheckboxChanged()</slot>
  </slots>
 </ui>
