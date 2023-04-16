@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # coding=utf-8
-import os
 import traceback
 
 import openpyxl as oxl
@@ -17,13 +16,14 @@ class ExportExcellThread(QThread):
         super(ExportExcellThread, self).__init__()
         self.resultTable = resultTable
         self.saveCount = saveCount
+        self.notExportColIndexList = [2]  # 不导出的列序号，从0开始
 
     def run(self):
         nowTable = self.resultTable
         nowRowCount = nowTable.rowCount()
         nowColCount = nowTable.columnCount()
         nowHeader = [nowTable.horizontalHeaderItem(index).text() for index in range(nowColCount)]
-        nowHeader = ["序号"] + nowHeader
+        nowHeader = ["序号"] + [item for index, item in enumerate(nowHeader) if index not in self.notExportColIndexList]
 
         filename = "导出文件 " + myUtils.getNowSeconed()
         filename = myUtils.updateFileNameStr(filename)
@@ -51,12 +51,17 @@ class ExportExcellThread(QThread):
                 else:
                     pass
                 myUtils.writeExcellCell(ws, rowIndex + 2, 1, str(rowIndex + 1), 0, True)
+                exportColIndex = 2
                 for colIndex in range(nowColCount):
-                    nowItemText = nowTable.item(rowIndex, colIndex).text()
+                    if colIndex not in self.notExportColIndexList:
+                        nowItemText = nowTable.item(rowIndex, colIndex).text()
 
-                    # 将值写入excell对象
-                    myUtils.writeExcellCell(ws, rowIndex + 2, colIndex + 2, nowItemText, 0, True)
-                myUtils.writeExcellSpaceCell(ws, rowIndex + 2, nowColCount + 2)
+                        # 将值写入excell对象
+                        myUtils.writeExcellCell(ws, rowIndex + 2, exportColIndex, nowItemText, 0, True)
+                        exportColIndex = exportColIndex + 1
+                    else:
+                        continue
+                myUtils.writeExcellSpaceCell(ws, rowIndex + 2, exportColIndex)
 
                 # 指定数量行保存一次
                 if rowIndex != 0 and rowIndex % self.saveCount == 0:
@@ -65,8 +70,8 @@ class ExportExcellThread(QThread):
                     ws = wb.get_sheet_by_name(wb.get_sheet_names()[0])
 
             # 设置列宽
-            colWidthArr = [7, 20, 10, 20]
-            for colIndex in range(nowColCount):
+            colWidthArr = [7, 20, 8]
+            for colIndex in range(nowColCount - 1):
                 colWidthArr.append(30)
             myUtils.setExcellColWidth(ws, colWidthArr)
 
@@ -78,39 +83,3 @@ class ExportExcellThread(QThread):
             resultFlag = False
             logStr = "保存文件失败，报错信息为：{0}".format(traceback.format_exc())
             self.signal_end.emit(resultFlag, logStr)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

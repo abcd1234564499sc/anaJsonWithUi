@@ -10,7 +10,6 @@ import traceback
 import warnings
 from queue import Queue
 
-import openpyxl as oxl
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import Qt, QDir
 from PyQt5.QtGui import QTextCursor
@@ -330,7 +329,7 @@ class Main(QMainWindow, Ui_mainForm):
             tmpDic["name"] = nowName
             tmpDic["struct"] = nowStrcut
             tmpDic["checkStatus"] = nowCheckStatus
-            if nowCheckStatus != 0 and nowStrcut != "":
+            if nowCheckStatus == 2 and nowStrcut != "" and nowType == "值":
                 selectDicList.append(tmpDic)
             else:
                 continue
