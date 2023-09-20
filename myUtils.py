@@ -335,19 +335,20 @@ def analysisPacketFromTxt(packetTxt, notReadKeys=["Content-Length"]):
 
     # 处理cookie字符串
     cookie = {}
-    tmpList = cookieStr.split(";")
-    for tmpStr in tmpList:
-        tmpCookieItem = tmpStr.split("=")
-        nowKey = tmpCookieItem[0]
-        nowValue = "=".join(tmpCookieItem[1:])
-        cookie[nowKey] = nowValue
+    if cookieStr!="":
+        tmpList = cookieStr.split(";")
+        for tmpStr in tmpList:
+            tmpCookieItem = tmpStr.split("=")
+            nowKey = tmpCookieItem[0]
+            nowValue = "=".join(tmpCookieItem[1:])
+            cookie[nowKey] = nowValue
 
     # 生成返回结果字典
     reDic["requestType"] = requestType
     reDic["host"] = host
     reDic["uri"] = uri
     reDic["header"] = header
-    reDic["data"] = dataLineContent
+    reDic["data"] = dataLineContent.encode("utf-8")
     reDic["cookie"] = cookie
     return reDic
 
