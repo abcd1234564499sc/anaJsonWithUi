@@ -12,7 +12,7 @@ class ExportExcellThread(QThread):
     signal_end = pyqtSignal(bool, str)
     signal_log = pyqtSignal(str)
 
-    def __init__(self, resultTable, saveCount=1000):
+    def __init__(self, resultTable, saveCount=10000):
         super(ExportExcellThread, self).__init__()
         self.resultTable = resultTable
         self.saveCount = saveCount
@@ -27,6 +27,7 @@ class ExportExcellThread(QThread):
 
         filename = "导出文件 " + myUtils.getNowSeconed()
         filename = myUtils.updateFileNameStr(filename)
+        fileFullName = filename+".xlsx"
         resultFlag = False
         logStr = ""
         self.signal_log.emit("导出文件名为：{}".format(filename))
@@ -66,7 +67,7 @@ class ExportExcellThread(QThread):
                 # 指定数量行保存一次
                 if rowIndex != 0 and rowIndex % self.saveCount == 0:
                     myUtils.saveExcell(wb, saveName=filename)
-                    wb = oxl.open(filename)
+                    wb = oxl.open(fileFullName)
                     ws = wb.get_sheet_by_name(wb.get_sheet_names()[0])
 
             # 设置列宽

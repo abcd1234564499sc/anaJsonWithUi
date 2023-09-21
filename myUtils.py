@@ -17,6 +17,8 @@ from PyQt5.QtWidgets import QTableWidgetItem
 from openpyxl.styles import Border, Side, Font, PatternFill
 
 borderNumDic = {-1: None, 0: "thin"}
+# 降低SECLEVEL级别，防止SSL异常
+requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS = 'DEFAULT:@SECLEVEL=1'
 
 
 # 处理json字符串，返回一个用字典存储的树状结构，注意，该方法只能处理list中结构相同的字符串
@@ -212,7 +214,7 @@ def getNowSeconed():
 # "status":访问的响应码，
 # "requestSeconed":访问耗时，单位为秒
 # }
-def requestsUrl(url, cookie={}, header={}, data={}, files=None, type=0, reqTimeout=10, readTimeout=10,
+def requestsUrl(url, cookie={}, header={}, data={}, files=None, type=0, reqTimeout=10, readTimeout=120,
                 allow_redirects=False, session=None, proxies=None):
     if session is None:
         session = requests.session()
