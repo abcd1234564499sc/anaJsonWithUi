@@ -55,7 +55,11 @@ class ExportExcellThread(QThread):
                 exportColIndex = 2
                 for colIndex in range(nowColCount):
                     if colIndex not in self.notExportColIndexList:
-                        nowItemText = nowTable.item(rowIndex, colIndex).text()
+                        nowItem = nowTable.item(rowIndex, colIndex)
+                        if nowItem is None:
+                            nowItemText = "None"
+                        else:
+                            nowItemText = nowItem.text()
 
                         # 将值写入excell对象
                         myUtils.writeExcellCell(ws, rowIndex + 2, exportColIndex, nowItemText, 0, True)
