@@ -145,7 +145,7 @@ class Main(QMainWindow, Ui_mainForm):
         # 生成字典
         confDic = {self.confHeadList[0]: 1 if nowProxyCheckStatus else 0, self.confHeadList[1]: nowProxyIp,
                    self.confHeadList[2]: nowProxyPort, self.confHeadList[3]: 1 if nowIfProxyUseHttps else 0,
-                   self.confHeadList[4]: int(self.confDic[self.headerList[4]])}
+                   self.confHeadList[4]: int(self.confDic[self.confHeadList[4]])}
 
         # 保存到配置文件
         confFilePath = os.path.join(os.getcwd(), self.confFileName)
