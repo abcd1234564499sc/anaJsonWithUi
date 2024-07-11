@@ -676,7 +676,18 @@ def ifTowListHasSameItem(list1,list2):
     reFlag = False
     for item1 in list1:
         for item2 in list2:
-            if item1 == item2:
+            item1_len = len(item1)
+            item2_len = len(item2)
+            # 按长度截取并比较
+            cmpItem1 = ""
+            cmpItem2 = ""
+            if item1_len >=item2_len:
+                cmpItem1 = item1[:item2_len]
+                cmpItem2 = item2
+            else:
+                cmpItem1 = item2[:item1_len]
+                cmpItem2 = item1
+            if cmpItem1 == cmpItem2:
                 reFlag = True
                 break
             else:
