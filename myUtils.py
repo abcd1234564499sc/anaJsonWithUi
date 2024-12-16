@@ -4,10 +4,10 @@ import copy
 import datetime
 import json
 import os
+import queue
 import re
 import socket
 import traceback
-from queue import Queue
 
 import openpyxl as oxl
 import requests
@@ -21,105 +21,61 @@ borderNumDic = {-1: None, 0: "thin"}
 requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS = 'DEFAULT:@SECLEVEL=1'
 
 
-# 处理json字符串，返回一个用字典存储的树状结构，注意，该方法只能处理list中结构相同的字符串
-# 返回结果字典，列表中存储一个树状结构，每个节点是一个字典的key值或者list的指代符号或者空字典，key值一定是字符串，list指代符号是该list的长度，
+def createAnalysisJsonResultItem():
+    reDict = {}
+
+    reDict["level"] = -1
+    reDict["value"] = ""
+    reDict["nextItems"] = {}
+
+    return reDict
+
+# 处理json对象，返回一个用字典存储的树状结构
+# 返回结果字典，列表中存储一个树状结构，每个节点代表一个json item
+# 节点key的格式为：<父节点类型(list、dict、root)>_<父节点获取该子节点的关键词，dict为key值，list为index>_<该节点的类型，字典为dict，列表为list，其他值为该值的类型：str、int、float等>，节点的值为一个字典结构，由createAnalysisJsonResultItem函数定义
 # 例：
-# {"flag":{},"data":{5:{"id":{},"name":{}}}}
-def anaJson(jsonStr):
-    reStr = ""
-    reDic = {}
-    try:
-        jsonObj = json.loads(jsonStr)
-    except Exception as ex:
-        reStr = "传入的字符串不符合json格式"
-        return reStr, reDic
-    processList = []
-    processList.append({"obj": jsonObj, "saveDic": reDic})
-    try:
-        while len(processList) != 0:
-            nowProcessDic = processList.pop()
-            nowObj = nowProcessDic["obj"]
-            nowSaveDic = nowProcessDic["saveDic"]
-            nowType = checkObjType(nowObj)
-            if nowType == 1:
-                # 当前类型为字典时
-                nowKeys = nowObj.keys()
-                for nowKey in nowKeys:
-                    nowKey = str(nowKey)
-                    # 判断树状结构上是否存在相同的key
-                    if nowKey in nowSaveDic.keys():
-                        # 存在，则不进行处理
-                        continue
-                    else:
-                        # 不存在，进行处理
-                        nowKeyObj = nowObj[nowKey]
-                        nowSaveDic[nowKey] = {}
-                        processList.append({"obj": nowKeyObj, "saveDic": nowSaveDic[nowKey]})
-            elif nowType == 2:
-                # 当前类型为列表时
-                nowLen = len(nowObj)
-                nowSaveDic[nowLen] = {}
-                if nowLen != 0:
-                    nowKeyObj = nowObj[0]
-                    processList.append({"obj": nowKeyObj, "saveDic": nowSaveDic[nowLen]})
-                else:
-                    pass
-            else:
-                # 当前类型为其他时
-                pass
-    except Exception as ex:
-        reStr = "解析时发生异常，异常为：" + str(ex)
-        reDic = {}
+# {"a":{"b":"c","d":[1,2,"3"]},"e":1.1}
+# {'root_0_dict': {'level': 0, 'value': '2', 'nextItems': {'dict_a_dict': {'level': 1, 'value': '2', 'nextItems': {'dict_b_str': {'level': 2, 'value': 'c', 'nextItems': {}}, 'dict_d_list': {'level': 2, 'value': '3', 'nextItems': {'list_0_int': {'level': 3, 'value': '1', 'nextItems': {}}, 'list_1_int': {'level': 3, 'value': '2', 'nextItems': {}}, 'list_2_str': {'level': 3, 'value': '3', 'nextItems': {}}}}}}, 'dict_e_float': {'level': 1, 'value': '1.1', 'nextItems': {}}}}}
+def analysisJsonObjToDict(jsonObj):
+    reDict = {}
 
-    return reStr, reDic
+    anaQueue = queue.Queue()
 
+    anaQueue.put({"obj":jsonObj,"resultDict":reDict,"level":0,"keyStr":"root_0"})
 
-# 传入json的树状结构列表，返回一个节点字典的列表，节点字典结构如下：
-# {
-#   "key":节点键值,
-#   "parent":父节点对象，根节点该值为{},
-#   "value":该节点对应的值,
-#   "location":节点的访问用nodelist，从根节点开始，结合getJsonResultByNodeList函数使用,
-#   "type":节点类型，值为0，字典为1，数组为2
-# }
-def anaJsonTreeToNodeList(jsonTreeDic):
-    resultList = []
-    keyQueue = Queue()
-    for tmpKey in jsonTreeDic.keys():
-        keyQueue.put({"key": tmpKey, "parent": {}, "value": jsonTreeDic[tmpKey], "location": []})
-    while not keyQueue.empty():
-        tmpKeyItem = keyQueue.get()
-        if type(tmpKeyItem["key"]) != int:
-            tmpResultDic = {}
-            tmpResultDic.update(tmpKeyItem)
-            nowLocDic = {"value": tmpKeyItem["key"], "type": 0}  # 0表示值（包括值和字典类型）,1表示数组
-            nowLoaction = copy.deepcopy(tmpKeyItem["location"])
-            nowLoaction.append(nowLocDic)
-            tmpResultDic["location"] = nowLoaction
+    while not anaQueue.empty():
+        tmpObjDict = anaQueue.get()
+        tmpJsonObj = tmpObjDict["obj"]
+        tmpResultDict = tmpObjDict["resultDict"]
+        tmpLevel = tmpObjDict["level"]
+        tmpKeyStr = tmpObjDict["keyStr"]
 
-            if tmpKeyItem["value"] == {}:
-                tmpResultDic["type"] = 0
-            else:
-                tmpResultDic["type"] = 1
-            resultList.append(tmpResultDic)
-
-            for tmpKey in tmpKeyItem["value"].keys():
-                tmpItem = {"key": tmpKey, "parent": tmpResultDic, "value": tmpKeyItem["value"][tmpKey],
-                           "location": nowLoaction}
-                keyQueue.put(tmpItem)
+        if type(tmpJsonObj) == dict:
+            tmpResultKey = f"{tmpKeyStr}_dict"
+            tmpResultItem = createAnalysisJsonResultItem()
+            tmpResultItem["level"] = tmpLevel
+            tmpResultItem["value"] = str(len(tmpJsonObj.keys()))
+            tmpResultDict[tmpResultKey] = tmpResultItem
+            for tmpKey,tmpVal in tmpJsonObj.items():
+                anaQueue.put({"obj": copy.deepcopy(tmpVal), "resultDict": tmpResultDict[tmpResultKey]["nextItems"], "level": tmpLevel+1,"keyStr":f"dict_{tmpKey}"})
+        elif type(tmpJsonObj) == list:
+            tmpResultKey = f"{tmpKeyStr}_list"
+            tmpResultItem = createAnalysisJsonResultItem()
+            tmpResultItem["level"] = tmpLevel
+            tmpResultItem["value"] = str(len(tmpJsonObj))
+            tmpResultDict[tmpResultKey] = tmpResultItem
+            for tmpIndex,tmpVal in enumerate(tmpJsonObj):
+                anaQueue.put(
+                    {"obj": copy.deepcopy(tmpVal), "resultDict": tmpResultDict[tmpResultKey]["nextItems"], "level": tmpLevel + 1,
+                     "keyStr": f"list_{tmpIndex}"})
         else:
-            # 处理数组的情况
-            nowListCount = tmpKeyItem["key"]
-            nowLoaction = tmpKeyItem["location"]
-            nowLoaction[-1]["type"] = 1
-            nowParentObj = tmpKeyItem["parent"]
-            nowParentObj["type"] = 2
-            nowParentObj["location"] = nowLoaction
-            for tmpKey in tmpKeyItem["value"].keys():
-                tmpItem = {"key": tmpKey, "parent": tmpKeyItem["parent"], "value": tmpKeyItem["value"][tmpKey],
-                           "location": nowLoaction}
-                keyQueue.put(tmpItem)
-    return resultList
+            tmpResultKey = f"{tmpKeyStr}_{type(tmpJsonObj).__name__}"
+            tmpResultItem = createAnalysisJsonResultItem()
+            tmpResultItem["level"] = tmpLevel
+            tmpResultItem["value"] = str(tmpJsonObj)
+            tmpResultDict[tmpResultKey] = tmpResultItem
+
+    return reDict
 
 
 # 判断传入的对象类型，是dict返回1，是list返回2，否则返回0
@@ -396,34 +352,6 @@ def coordinatePlus(nowCoordinate, maxCoordinate):
     return ifAddFlag, nowCoordinate
 
 
-# nodeList 的结构为：{"value":键值,"type":类型，0为值，1为数组}
-# 根据传入的nodeList,获取对应的值，返回一个list
-def getJsonResultByNodeList(jsonContent, nodeList):
-    finalResultList = []
-    parentResultQueue = []
-    nowResultQueue = []
-    parentResultQueue.append(jsonContent)
-    try:
-        for tmpIndex, node in enumerate(nodeList):
-            nowVal = node["value"]
-            nowType = int(node["type"])
-            while not len(parentResultQueue) == 0:
-                tmpParentObj = parentResultQueue.pop(0)
-                if nowType == 0:
-                    tmpNowResultObj = tmpParentObj[nowVal]
-                    nowResultQueue.append(tmpNowResultObj)
-                else:
-                    for tmpNowResultObj in tmpParentObj[nowVal]:
-                        nowResultQueue.append(tmpNowResultObj)
-
-            parentResultQueue = copy.deepcopy(nowResultQueue)
-            nowResultQueue = []
-        finalResultList = copy.deepcopy(parentResultQueue)
-    except:
-        finalResultList = [None]
-    return finalResultList
-
-
 # 获得excell的常用样式
 def getExcellStyleDic():
     styleDic = {}
@@ -575,125 +503,3 @@ def updateFileNameStr(oriStr):
     for nowNotAllowChar in notAllowCharList:
         resultStr = resultStr.replace(nowNotAllowChar, "_")
     return resultStr
-
-
-# 输入一个JSON字符串，返回一个包含所有结果的列表
-def getJsonResultList(jsonContent):
-    jsonObj = json.loads(jsonContent)
-    reStr, jsonDic = anaJson(jsonContent)
-    resultList = [["[]"], ["[]"]]  # 第一个数组存储键值，后面的每个数组的第一位为键值
-    keyQueue = Queue()
-    for tmpKey in jsonDic.keys():
-        keyQueue.put(
-            {"key": tmpKey, "parent": {}, "value": jsonDic[tmpKey], "location": [], "resultLoc": "[]",
-             "jsonValue": jsonObj})
-    while not keyQueue.empty():
-        tmpKeyItem = keyQueue.get()
-        if type(tmpKeyItem["key"]) != int:
-            tmpResultDic = {}
-            tmpResultDic.update(tmpKeyItem)
-            nowLocDic = {"value": tmpKeyItem["key"], "type": 0}  # 0表示值（包括值和字典类型）,1表示数组
-
-            if len(tmpKeyItem["value"].keys()) == 1 and type(list(tmpKeyItem["value"].keys())[0]) == int:
-                tmpResultDic["type"] = 2
-                nowLocDic["type"] = 1
-            elif type(tmpKeyItem["value"]) == dict:
-                tmpResultDic["type"] = 1
-            else:
-                tmpResultDic["type"] = 0
-            resultLocationStr = tmpKeyItem["resultLoc"]
-            nowLoaction = copy.deepcopy(tmpKeyItem["location"])
-            nowLoaction.append(nowLocDic)
-            tmpResultDic["location"] = nowLoaction
-            tmpResultDic["resultLoc"] = tmpKeyItem["resultLoc"]
-            jsonVal = tmpKeyItem["jsonValue"][tmpKeyItem["key"]]
-            tmpResultDic["jsonValue"] = jsonVal
-
-            resultListIndexList = []
-            for tmpIndex, tmpKey in enumerate(resultList[0]):
-                if tmpKey[:len(resultLocationStr)] == resultLocationStr:
-                    resultListIndexList.append(tmpIndex)
-
-            for tmpIndex in resultListIndexList:
-                tmpResultList = resultList[tmpIndex + 1]
-                tmpResultList.append(tmpResultDic)
-
-            for tmpKey in tmpKeyItem["value"].keys():
-                tmpItem = {"key": tmpKey, "parent": tmpResultDic, "value": tmpKeyItem["value"][tmpKey],
-                           "location": nowLoaction, "resultLoc": resultLocationStr, "jsonValue": jsonVal}
-                keyQueue.put(tmpItem)
-        else:
-            # 处理数组的情况
-            nowListCount = tmpKeyItem["key"]
-            nowLoaction = tmpKeyItem["location"]
-            nowResultLocation = tmpKeyItem["resultLoc"]
-            if nowListCount != 0:
-                # 修改resultList
-                tmpResultList = [[]]
-                for tmpIndex, tmpKey in enumerate(resultList[0]):
-                    for tmpAddIndex in range(nowListCount):
-                        nowHeader = tmpKey + "[{}]".format(str(tmpAddIndex))
-                        # 修改表头
-                        tmpResultList[0].append(nowHeader)
-                        # 修改数据
-                        tmpDataList = copy.deepcopy(resultList[tmpIndex + 1])
-                        tmpDataList[0] = nowHeader
-                        tmpResultList.append(tmpDataList)
-                resultList = copy.deepcopy(tmpResultList)
-                nowJsonVal = tmpKeyItem["jsonValue"] if type(tmpKeyItem["jsonValue"]) == list else []
-                # 将数组中的元素加入队列
-                for tmpKey in tmpKeyItem["value"].keys():
-                    for tmpIndex in range(len(nowJsonVal)):
-                        tmpResultLocation = nowResultLocation + "[{}]".format(str(tmpIndex))
-                        tmpJsonVal = nowJsonVal[tmpIndex]
-                        tmpValue = tmpKeyItem["value"][tmpKey]
-                        if tmpKey not in tmpJsonVal.keys():
-                            tmpJsonVal.update({tmpKey: "None"})
-                            tmpValue = {}
-                        tmpItem = {"key": tmpKey, "parent": tmpKeyItem["parent"], "value": tmpValue,
-                                   "location": nowLoaction, "resultLoc": tmpResultLocation,
-                                   "jsonValue": tmpJsonVal}
-                        keyQueue.put(tmpItem)
-            else:
-                pass
-
-    # 处理返回结果
-    reResultDic = {}
-    for index in range(1, len(resultList)):
-        nowResultItem = resultList[index]
-        for tmpIndex in range(1, len(nowResultItem)):
-            nowTmpResultDic = nowResultItem[tmpIndex]
-            nowResultVal = nowTmpResultDic["jsonValue"]
-            nowLoc = nowTmpResultDic["location"]
-            nowLocStr = json.dumps(nowLoc)
-            if nowLocStr in reResultDic.keys():
-                reResultDic[nowLocStr].append(nowResultVal)
-            else:
-                reResultDic[nowLocStr] = [nowResultVal]
-    return reResultDic
-
-def ifTowListHasSameItem(list1,list2):
-    reFlag = False
-    for item1 in list1:
-        for item2 in list2:
-            item1_len = len(item1)
-            item2_len = len(item2)
-            # 按长度截取并比较
-            cmpItem1 = ""
-            cmpItem2 = ""
-            if item1_len >=item2_len:
-                cmpItem1 = item1[:item2_len]
-                cmpItem2 = item2
-            else:
-                cmpItem1 = item2[:item1_len]
-                cmpItem2 = item1
-            if cmpItem1 == cmpItem2:
-                reFlag = True
-                break
-            else:
-                pass
-        if reFlag:
-            break
-        else:
-            pass
-    return reFlag

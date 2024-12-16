@@ -2,139 +2,146 @@
 # coding=utf-8
 import copy
 import json
+import time
+from queue import Queue
 
 from PyQt5.QtCore import QThread, pyqtSignal
 
-import myUtils
-
 
 class AnaJsonThread(QThread):
-    signal_result = pyqtSignal(list)
+    signal_result = pyqtSignal(dict)
 
-    def __init__(self, selectDicList=None):
+    def __init__(self):
         super(AnaJsonThread, self).__init__()
-        self.selectDicList = selectDicList
+        self.queue = Queue()
 
-    def setSelectDicList(self, selectDicList):
-        self.selectDicList = selectDicList
+    def stopThread(self):
+        self.runFlag = False
 
-    def mergeHeader(self, nowHeaderList, newHeaderStr):
-        ifExist = False
-        for tmpLocIndex, tmpLoc in enumerate(nowHeaderList):
-            if tmpLoc == newHeaderStr[:len(tmpLoc)]:
-                nowHeaderList[tmpLocIndex] = newHeaderStr
-                ifExist = True
-            else:
-                pass
-        if not ifExist:
-            nowHeaderList.append(newHeaderStr)
-        nowHeaderList = list(set(nowHeaderList))
-        nowHeaderList.sort(key=lambda a: len(a))
-        return nowHeaderList
+    def addSelectStructList(self,packageIndex=-1, selectStructList=[],jsonObj={},headerList=[],inputStr=""):
+        tmpDict = {"packageIndex":packageIndex,"selectStructList":selectStructList,"jsonObj":jsonObj,"headerList":headerList,"inputStr":inputStr}
+        self.queue.put(tmpDict)
 
     def run(self):
-        # 根据选择的JSONKey值转换出一个用于方便的请求JSON值的字符串二维数组，格式形如["a"][1]
-        selectDicList = self.selectDicList
-        sortedSelectDicList = sorted(selectDicList, key=lambda a: len(a["struct"]))
-        finalJsonStrList = [[[]], [0]]  # 第一个元素为header列表，第二个元素开始是数据数组，每个数据数组的第一个元素是临时数据
-        reHeaderList = []
-        for tmpSelectIndex, tmpSelectDic in enumerate(sortedSelectDicList):
-            nowStruct = json.loads(tmpSelectDic["struct"])
-            nowName = tmpSelectDic["name"]
-            reHeaderList.append(nowName)
-            nowLocList = []
-            nowSelectDicJsonArgList = [{"value": '', "loc": []}]
-            for tmpStruct in nowStruct:
-                nowStructType = tmpStruct["type"]
-                nowStructValue = tmpStruct["value"]
-                nowListCount = tmpStruct["listCount"]
-                if nowStructType == 0:
-                    # 非数组的情况
-                    for tmpJsonArg in nowSelectDicJsonArgList:
-                        tmpJsonArg["value"] = tmpJsonArg["value"] + '["{}"]'.format(nowStructValue)
-                else:
-                    # 数组的情况
-                    # 构建新的结果数组
-                    newSelectDicJsonArgList = []
-                    for tmpJsonArg in nowSelectDicJsonArgList:
-                        if nowStructValue != "":
-                            tmpJsonArg["value"] = tmpJsonArg["value"] + '["{}"]'.format(nowStructValue)
-                        for tmpIndex in range(nowListCount):
-                            newJsonArg = copy.deepcopy(tmpJsonArg)
-                            newJsonArg["value"] = newJsonArg["value"] + "[{}]".format(tmpIndex)
-                            newJsonArg["loc"] = self.mergeHeader(newJsonArg["loc"], newJsonArg["value"])
-                            newSelectDicJsonArgList.append(newJsonArg)
-                    nowSelectDicJsonArgList = copy.deepcopy(newSelectDicJsonArgList)
-            # 当前选项的所有JsonArg构建完成，开始与最终结果数组对比判断如何添加
-            checkJsonStrList = copy.deepcopy(finalJsonStrList)
-            # 将每行数据的第一个临时数据改成当前序号
-            for tmpIndex in range(1, len(finalJsonStrList)):
-                finalJsonStrList[tmpIndex][0] = tmpIndex - 1
-            # 开始处理
-            finalAddCount = 0
-            for nowSelectDicJsonArg in nowSelectDicJsonArgList:
-                nowLoc = nowSelectDicJsonArg["loc"]
-                nowValue = nowSelectDicJsonArg["value"]
-                nowAddIndex = []
-                for tmpResultIndex, tmpResultLocList in enumerate(finalJsonStrList[0]):
-                    if myUtils.ifTowListHasSameItem(tmpResultLocList, nowLoc):
-                        # 出现相同的数组前缀，说明该项只添加至该行
-                        nowAddIndex.append(tmpResultIndex)
-                    else:
-                        pass
-                # 遍历需要添加行序号，执行添加操作
-                nowAddIndex.sort(reverse=True)
-                for tmpAddIndex in nowAddIndex:
-                    nowSolveIndex = tmpAddIndex
-                    nowResultListLen = len(finalJsonStrList[nowSolveIndex + 1])
-                    if nowResultListLen - 1 >= tmpSelectIndex + 1:
-                        # 复制该行数据
-                        tmpLineData = copy.deepcopy(finalJsonStrList[nowSolveIndex + 1])
-                        tmpHeaderData = copy.deepcopy(finalJsonStrList[0][nowSolveIndex])
-                        finalJsonStrList.insert(nowSolveIndex + 1, tmpLineData)
-                        finalJsonStrList[0].insert(nowSolveIndex, tmpHeaderData)
-                        # 修改处理行序号
-                        nowSolveIndex = nowSolveIndex + 1
-                        # 将处理行修改为原始状态
-                        tmpOriIndex = tmpLineData[0]
-                        finalJsonStrList[nowSolveIndex + 1] = checkJsonStrList[tmpOriIndex + 1]
-                        finalJsonStrList[0][nowSolveIndex] = checkJsonStrList[0][tmpOriIndex]
-                    else:
-                        pass
-                    # 修改结果头
-                    tmpLoc = copy.deepcopy(finalJsonStrList[0][nowSolveIndex])
-                    for tmpNowLocStr in nowLoc:
-                        tmpLoc = self.mergeHeader(tmpLoc, tmpNowLocStr)
-                    finalJsonStrList[0][nowSolveIndex] = copy.deepcopy(tmpLoc)
-                    # 修改对应行的数据
-                    finalJsonStrList[nowSolveIndex + 1].append(nowValue)
-                finalAddCount = finalAddCount + len(nowAddIndex)
-            # 若没有匹配任意一行，则往所有结果行添加本次选择的所有数据
-            if finalAddCount == 0:
-                checkJsonStrList = copy.deepcopy(finalJsonStrList)
-                # 将每行数据的第一个临时数据改成当前序号
-                for tmpIndex in range(1, len(finalJsonStrList)):
-                    finalJsonStrList[tmpIndex][0] = tmpIndex - 1
-                tmpJsonStrList = [[]]
-                for nowSelectDicJsonArg in nowSelectDicJsonArgList:
-                    nowSelectLoc = nowSelectDicJsonArg["loc"]
-                    nowSelectVal = nowSelectDicJsonArg["value"]
-                    for tmpAddIndex in range(len(finalJsonStrList[0])):
-                        nowLoc = copy.deepcopy(finalJsonStrList[0][tmpAddIndex])
-                        nowData = copy.deepcopy(finalJsonStrList[tmpAddIndex + 1])
-                        for tmpNowLocStr in nowSelectLoc:
-                            nowLoc = self.mergeHeader(nowLoc, tmpNowLocStr)
-                        nowData.append(nowSelectVal)
-                        tmpJsonStrList[0].append(nowLoc)
-                        tmpJsonStrList.append(copy.deepcopy(nowData))
-                finalJsonStrList = copy.deepcopy(tmpJsonStrList)
-            else:
-                pass
+        self.runFlag = True
+        while self.runFlag:
+            if not self.queue.empty():
+                reDict = {}
+                inputDic = self.queue.get()
+                nowSelectStructList = inputDic["selectStructList"]
+                nowPackageIndex = inputDic["packageIndex"]
+                nowJsonObj = inputDic["jsonObj"]
+                nowHeaderList = inputDic["headerList"]
+                nowInputStr = inputDic["inputStr"]
 
-        # 处理结束，处理结果并返回
-        reResultList = []
-        reResultList.append(reHeaderList)
-        for tmpIndex in range(1, len(finalJsonStrList)):
-            nowResultList = finalJsonStrList[tmpIndex][1:]
-            reResultList.append(nowResultList)
-        self.signal_result.emit(reResultList)
+                # 根据勾选的struct获取对应的值
+                selectedJsonVaList = []
+                for nowSelectStructStr in nowSelectStructList:
+                    tmpSavedResultList = [nowJsonObj]
+                    tmpSelectStructs = nowSelectStructStr.split(",")
+                    tmpLevel = len(tmpSelectStructs)-1
+                    tmpHeaderStructStr = tmpSelectStructs[-1]
+                    tmpSplitedHeaderStructList = tmpHeaderStructStr.split("_")
+                    tmpHeaderKey = tmpSplitedHeaderStructList[1]
+                    tmpHeaderStr = f"[{tmpLevel}]{tmpHeaderKey}"
+                    for tmpStructStr in tmpSelectStructs:
+                        tmpSplitedStructStrList = tmpStructStr.split("_")
+                        tmpParentType = tmpSplitedStructStrList[0]
+                        tmpJsonKey = tmpSplitedStructStrList[1]
+                        tmpType = tmpSplitedStructStrList[2]
+
+                        if tmpParentType == "root":
+                            continue
+                        if tmpParentType == "list":
+                            tmpResultList = []
+                            for tmpSavedItem in tmpSavedResultList:
+                                if type(tmpSavedItem)!=list:
+                                    tmpResultList.append(None)
+                                else:
+                                    for tmpItem in tmpSavedItem:
+                                        tmpResultList.append(tmpItem)
+                            tmpSavedResultList = copy.deepcopy(tmpResultList)
+                        elif tmpParentType == "dict":
+                            tmpResultList = []
+                            for tmpSavedItem in tmpSavedResultList:
+                                try:
+                                    tmpJsonVal = tmpSavedItem[tmpJsonKey]
+                                except:
+                                    tmpJsonVal = None
+                                tmpResultList.append(tmpJsonVal)
+                            tmpSavedResultList = copy.deepcopy(tmpResultList)
+                        else:
+                            continue
+
+                    # 将结果中的json对象转换为字符串
+                    for tmpIndex,tmpSavedResultItem in enumerate(tmpSavedResultList):
+                        if type(tmpSavedResultItem) == dict or type(tmpSavedResultItem) == list:
+                            tmpSavedResultList[tmpIndex] = json.dumps(tmpSavedResultItem)
+                        else:
+                            continue
+
+                    tmpSavedJsonDict = {"headerStr":tmpHeaderStr,"resultList":copy.deepcopy(tmpSavedResultList)}
+                    selectedJsonVaList.append(tmpSavedJsonDict)
+
+                # 对获取的json结果列表按长度进行排序
+                selectedJsonVaList.sort(key=lambda d:len(d["resultList"]))
+
+                # 合并相同长度的结果
+                mergeJsonValDict = {}
+                for nowSelectedJsonValDict in selectedJsonVaList:
+                    tmpHeaderStr = nowSelectedJsonValDict["headerStr"]
+                    tmpResultList = nowSelectedJsonValDict["resultList"]
+                    tmpResultListLength = len(tmpResultList)
+
+                    if tmpResultListLength not in mergeJsonValDict.keys():
+                        mergeJsonValDict[tmpResultListLength] = {"headerStrList":[tmpHeaderStr],"resultLists":[[result] for result in tmpResultList]}
+                    else:
+                        tmpAimAppendDict = mergeJsonValDict[tmpResultListLength]
+                        tmpAimAppendDict["headerStrList"].append(tmpHeaderStr)
+                        for tmpAimAppendResultRowIndex,tmpAimAppendResultRow in enumerate(tmpAimAppendDict["resultLists"]):
+                            tmpAimAppendResultRow.append(tmpResultList[tmpAimAppendResultRowIndex])
+
+                # 合并不同长度的结果（直接相乘）
+                seconedMergeResultList = []
+                seconedMergeHeaderList = []
+                for tmpLen,tmpJsonValDict in mergeJsonValDict.items():
+                    tmpHeaderList = tmpJsonValDict["headerStrList"]
+                    tmpResultList = tmpJsonValDict["resultLists"]
+
+                    seconedMergeHeaderList = seconedMergeHeaderList + tmpHeaderList
+                    if len(seconedMergeResultList)==0:
+                        seconedMergeResultList = copy.deepcopy(tmpResultList)
+                    else:
+                        tmpMergeList = []
+                        for tmpSavedResultRow in seconedMergeResultList:
+                            for tmpNowResultRow in tmpResultList:
+                                tmpMergeResultRow = tmpSavedResultRow+tmpNowResultRow
+                                tmpMergeList.append(tmpMergeResultRow)
+                        seconedMergeResultList = copy.deepcopy(tmpMergeList)
+
+                # 根据传入的表头对列进行排序
+                finalSortedResultList = []
+                if not seconedMergeHeaderList == nowHeaderList:
+                    finalKeyTableDict = {}
+                    for tmpIndex, tmpKey in enumerate(seconedMergeHeaderList):
+                        finalKeyTableDict[tmpKey] = [row[tmpIndex] for row in seconedMergeResultList]
+
+                    for tmpKey in nowHeaderList:
+                        tmpColList = finalKeyTableDict[tmpKey]
+                        if len(finalSortedResultList) == 0:
+                            for tmpCol in tmpColList:
+                                finalSortedResultList.append([tmpCol])
+                        else:
+                            for tmpColIndex, tmpCol in enumerate(tmpColList):
+                                finalSortedResultList[tmpColIndex].append(tmpCol)
+                else:
+                    finalSortedResultList = seconedMergeResultList
+
+                # 构建返回结果并返回
+                reDict["packageIndex"] = nowPackageIndex
+                reDict["resultsList"] = finalSortedResultList
+                reDict["inputStr"] = nowInputStr
+                self.signal_result.emit(reDict)
+            else:
+                time.sleep(1)
+                continue

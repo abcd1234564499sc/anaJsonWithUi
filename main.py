@@ -37,21 +37,25 @@ class Main(QMainWindow, Ui_mainForm):
         self.confFileName = "工具配置.conf"
         self.confHeadList = ["是否使用代理", "代理IP", "代理端口", "代理服务器使用Https", "单次导出数据条数"]
         self.responseAnaResultTreeWidget.hideColumn(3)
+        self.responseAnaResultTreeWidget.header().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.confDic = self.initConfFile()
         self.createInputTabWidget(1)
         self.tableWidget_index1.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.resultTableHeaderBase = ["输入值", "响应码", "请求结果"]
+        self.resultTableHeaderBase = ["输入值"]
         self.createResponseTypeComboBox()
         # 开启网络请求线程
         self.anaJsonReqThread = RequestThread()
         self.anaJsonReqThread.signal_result.connect(self.doAnaJsonResponse)
         self.getResponseReqThread = RequestThread()
-        self.getResponseReqThread.signal_result.connect(self.doAddResponseToResult)
+        self.getResponseReqThread.signal_result.connect(self.doAnalysisResponseUseSelect)
         self.anaJsonThread = AnaJsonThread()
-        self.anaJsonThread.signal_result.connect(self.sendReuqestUseJsonArg)
+        self.anaJsonThread.signal_result.connect(self.doAddRowsToResultTable)
         self.anaJsonReqThread.start()
         self.getResponseReqThread.start()
+        self.anaJsonThread.start()
         self.exportExcellThread = None
+        self.sendPackageTotalCount = 0
+        self.solvedSendPackageCount = 0
 
     def createResponseTypeComboBox(self):
         for tmpIndex, tmpResponseTypeDic in enumerate(self.responseTypeList):
@@ -308,7 +312,7 @@ class Main(QMainWindow, Ui_mainForm):
     def sendPacketUseInput(self):
         # 获取返回值选择
         nowTopItemsCount = self.responseAnaResultTreeWidget.topLevelItemCount()
-        selectDicList = []
+        selectStructList = []
         itemQueue = Queue()
         for nowTopItemIndex in range(nowTopItemsCount):
             tmpItem = self.responseAnaResultTreeWidget.topLevelItem(nowTopItemIndex)
@@ -325,30 +329,68 @@ class Main(QMainWindow, Ui_mainForm):
             nowName = tmpItem.text(1)
             nowType = tmpItem.text(2)
             nowStrcut = tmpItem.text(3)
+            nowStrcut = json.loads(nowStrcut)
             nowCheckStatus = tmpItem.checkState(0)
             tmpDic["name"] = nowName
             tmpDic["struct"] = nowStrcut
-            tmpDic["checkStatus"] = nowCheckStatus
-            if nowCheckStatus == 2 and nowStrcut != "" and nowType == "值":
-                selectDicList.append(tmpDic)
+            # tmpDic["checkStatus"] = nowCheckStatus
+            if nowCheckStatus == 2:
+                tmpStructStr = ",".join(nowStrcut)
+
+                # 判断当前节点是否为存储节点中的子节点
+                tmpFindIndex = -1
+                tmpIfAddFlag = True
+                for tmpSavedStructIndex,tmpSavedStruct in enumerate(selectStructList):
+                    if len(tmpStructStr) > len(tmpSavedStruct) and tmpStructStr.find(tmpSavedStruct) == 0:
+                        # 当前节点层次更低
+                        tmpFindIndex = tmpSavedStructIndex
+                        break
+                    elif len(tmpStructStr) < len(tmpSavedStruct) and tmpSavedStruct.find(tmpStructStr) == 0:
+                        # 当前已存在更低层次节点
+                        tmpIfAddFlag = False
+                        break
+                    else:
+                        continue
+                if tmpFindIndex != -1:
+                    # 发现层次更低节点
+                    del selectStructList[tmpFindIndex]
+
+                if tmpIfAddFlag:
+                    # 将当前节点加入结果列表
+                    selectStructList.append(tmpStructStr)
             else:
                 continue
-        if len(selectDicList) == 0:
+        if len(selectStructList) == 0:
             warningStr = "没有勾选要输出的JSON值，请在[返回值解析]页面进行选择"
             self.writeLog(warningStr, 1)
             return
         else:
-            pass
-        self.anaJsonThread.setSelectDicList(selectDicList)
-        self.anaJsonThread.start()
-        warningStr = "正在根据勾选项进行分析"
-        self.writeLog(warningStr)
-        warningStr = "若勾选项过多，可能会耗费一段时间，请耐心等待"
-        self.writeLog(warningStr)
+            # 根据选项生成结果表头
+            nowHeaderList = []
+            for tmpSelectStructStr in selectStructList:
+                tmpSelectStructList = tmpSelectStructStr.split(",")
+                tmpLevel = len(tmpSelectStructList)-1
+                tmpHeaderStructStr = tmpSelectStructList[-1]
+                tmpSplitedHeaderStructList = tmpHeaderStructStr.split("_")
+                tmpHeaderKey = tmpSplitedHeaderStructList[1]
+                tmpHeaderStr = f"[{tmpLevel}]{tmpHeaderKey}"
+                nowHeaderList.append(tmpHeaderStr)
 
-    def sendReuqestUseJsonArg(self, jsonArgList):
-        warningStr = "勾选项分析完成，根据勾选项共会产生{}条结果".format(len(jsonArgList) - 1)
-        self.writeLog(warningStr)
+            # 生成结果表格头
+            warningStr = "正在生成结果表头"
+            self.writeLog(warningStr)
+            tmpTableHeader = self.resultTableHeaderBase + nowHeaderList
+            self.resultTable.setColumnCount(len(tmpTableHeader))
+            self.resultTable.setHorizontalHeaderLabels(tmpTableHeader)
+            self.resultTable.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            myUtils.clearTalbe(self.resultTable)
+
+            # 开始根据报文输入进行请求
+            warningStr = "开始发送请求"
+            self.writeLog(warningStr)
+            self.sendReuqestUseInput(selectStructList, nowHeaderList)
+
+    def sendReuqestUseInput(self,selectStructList,headerList):
         # 获取报文
         nowPacketStr = self.packetTextEdit.toPlainText()
         charIdeCount = nowPacketStr.count(self.charIde)
@@ -398,17 +440,9 @@ class Main(QMainWindow, Ui_mainForm):
             packetUseInputList.append({"packet": tmpPacketStr, "input": nowInputList})
             ifAddFlag, nowCoordinate = myUtils.coordinatePlus(nowCoordinate, maxCoordinate)
         # 开始请求
-        # 构建输出结果表格
-        tmpTableHeader = self.resultTableHeaderBase + [headerName for headerName in jsonArgList[0]]
-        self.resultTable.setColumnCount(len(tmpTableHeader))
-        self.resultTable.setHorizontalHeaderLabels(tmpTableHeader)
-        self.resultTable.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        myUtils.clearTalbe(self.resultTable)
-        warningStr = "开始根据输入值请求报文"
-        self.writeLog(warningStr, 0)
-        warningStr = "根据输入值，共需请求{0}次".format(len(packetUseInputList))
-        self.writeLog(warningStr, 0)
-        warningStr = "请求结果请查看[输出结果]页面"
+        self.sendPackageTotalCount = len(packetUseInputList)
+        self.solvedSendPackageCount = 0
+        warningStr = "根据输入值，共需请求{0}次".format(self.sendPackageTotalCount)
         self.writeLog(warningStr, 0)
         ifUseHttps = False if int(self.ifPacketUseHttpsCheckBox.checkState()) == 0 else True
         try:
@@ -419,15 +453,52 @@ class Main(QMainWindow, Ui_mainForm):
                 nowPacketDic = myUtils.analysisPacketFromTxt(nowPacketUseInputStr)
                 nowUrl = "{0}://{1}{2}".format(nowPro, nowPacketDic["host"], nowPacketDic["uri"])
                 extraDic = {"input": nowPacketInputListStr,
-                            "ifEnd": True if tmpPacketIndex == len(packetUseInputList) - 1 else False,
-                            "jsonArgList": jsonArgList}
+                            "packageIndex": tmpPacketIndex,"selectStructList":json.dumps(selectStructList),"headerList":json.dumps(headerList)}
                 self.getResponseReqThread.addUrl(nowUrl, cookie=nowPacketDic["cookie"], header=nowPacketDic["header"],
                                                  data=nowPacketDic["data"], type=nowPacketDic["requestType"],
                                                  proxies=self.proxies, extraData=extraDic)
+
         except Exception as ex:
             warningStr = traceback.format_exc()
             self.writeLog(warningStr, 2)
             return False
+
+    def doAnalysisResponseUseSelect(self,responseDict):
+        # 获取值
+        nowExtarDict = responseDict["extraData"]
+        nowRequestIndex = nowExtarDict["packageIndex"]
+        nowSelectStructList = json.loads(nowExtarDict["selectStructList"])
+        nowHeaderList = json.loads(nowExtarDict["headerList"])
+        nowInputStr = nowExtarDict["input"]
+        nowPackageResponseDict = responseDict["result"]
+        nowPackageResponseStatus = nowPackageResponseDict["status"]
+        nowPackageResponseCheckFlag = nowPackageResponseDict["checkFlag"]
+        nowPackageResponseResultStr = "成功" if nowPackageResponseCheckFlag else nowPackageResponseDict["resultStr"]
+        if nowPackageResponseCheckFlag:
+            # 请求成功
+            # 将请求结果按设置解析为JSON格式对象
+            pageContent = nowPackageResponseDict["pageContent"]
+            pageJsonDic = None
+            try:
+                pageContent = self.anaResponseByResponseType(pageContent)
+                pageJsonDic = json.loads(pageContent)
+            except:
+                # 将返回内容解析为JSON格式失败
+                # 给请求完成计数器+1
+                self.solvedSendPackageCount += 1
+                warningStr = f"[{self.solvedSendPackageCount}/{self.sendPackageTotalCount}] 第{nowRequestIndex + 1}次请求结果解析失败，报错为：{traceback.format_exc()}"
+                self.writeLog(warningStr)
+            if pageJsonDic is not None:
+                # 请求结果解析为JSON格式对象成功
+                # 调用解析线程进行解析处理
+                self.anaJsonThread.addSelectStructList(packageIndex=nowRequestIndex,selectStructList=nowSelectStructList,jsonObj=pageJsonDic,headerList=nowHeaderList,inputStr=nowInputStr)
+
+        else:
+            # 请求失败，打印失败原因
+            # 给请求完成计数器+1
+            self.solvedSendPackageCount += 1
+            warningStr = f"[{self.solvedSendPackageCount}/{self.sendPackageTotalCount}] 第{nowRequestIndex+1}次请求失败，响应码为{nowPackageResponseStatus},返回结果为：{nowPackageResponseResultStr}"
+            self.writeLog(warningStr)
 
     def responseTypeChange(self, nowIndex):
         nowNote = self.responseTypeList[nowIndex]["note"]
@@ -464,13 +535,17 @@ class Main(QMainWindow, Ui_mainForm):
             else:
                 repContent = repDic["pageContent"]
                 repContent = self.anaResponseByResponseType(repContent)
-                anaResultStr, anaJsonDic = myUtils.anaJson(repContent)
-                if anaResultStr != "":
-                    warningStr = "解析当前报文失败，错误信息为：{}".format(anaResultStr)
+                jsonContentObj = None
+                try:
+                    jsonContentObj = json.loads(repContent)
+                except Exception as ex:
+                    exceptStr = "传入的字符串不符合json格式"
+                    warningStr = "解析当前报文失败，错误信息为：{}".format(exceptStr)
                     self.writeLog(warningStr, 1)
                     self.startSendButton.setEnabled(False)
-                else:
-                    self.createTreeWidgetFromJsonTree(anaJsonDic)
+                if jsonContentObj is not None:
+                    anaJsonDict = myUtils.analysisJsonObjToDict(jsonContentObj)
+                    self.createTreeWidgetFromJsonTree(anaJsonDict)
                     warningStr = "请求成功，解析结果请查看[返回值解析]页面".format(inputDic["url"], repStatus)
                     self.writeLog(warningStr, 0)
                     self.startSendButton.setEnabled(True)
@@ -479,54 +554,73 @@ class Main(QMainWindow, Ui_mainForm):
     def createTreeWidgetFromJsonTree(self, treeDic):
         self.responseAnaResultTreeWidget.itemChanged['QTreeWidgetItem*', 'int'].disconnect()
         self.responseAnaResultTreeWidget.clear()
-        keyQueue = Queue()
-        for tmpKey in treeDic.keys():
-            keyQueue.put(
-                {"key": tmpKey, "parent": self.responseAnaResultTreeWidget, "value": treeDic[tmpKey],
+        itemQueue = Queue()
+        for tmpKey,tmpVal in treeDic.items():
+            itemQueue.put(
+                {"key": tmpKey, "parent": self.responseAnaResultTreeWidget, "value": tmpVal,
                  "location": []})
-        while not keyQueue.empty():
-            tmpKeyItem = keyQueue.get()
-            if type(tmpKeyItem["key"]) != int:
-                nowLocDic = {"value": tmpKeyItem["key"], "type": 0, "listCount": 0}  # 0表示值（包括值和字典类型）,1表示数组
-                nowLoaction = copy.deepcopy(tmpKeyItem["location"])
-                nowLoaction.append(nowLocDic)
-                tmpTreeItem = QTreeWidgetItem(tmpKeyItem["parent"])
-                tmpTreeItem.setCheckState(0, Qt.Unchecked)
-                if tmpKeyItem["value"] == {}:
-                    tmpTreeItem.setText(2, "值")
-                else:
-                    tmpTreeItem.setText(2, "字典")
-                tmpTreeItem.setText(1, str(tmpKeyItem["key"]))
-                tmpTreeItem.setText(3, json.dumps(nowLoaction))
+        while not itemQueue.empty():
+            tmpItemDict = itemQueue.get()
+            tmpKeyStr = tmpItemDict["key"]
+            tmpParentWidget = tmpItemDict["parent"]
+            tmpValObj = tmpItemDict["value"]
+            tmpLocation = tmpItemDict["location"]
 
-                for tmpKey in tmpKeyItem["value"].keys():
-                    tmpItem = {"key": tmpKey, "parent": tmpTreeItem, "value": tmpKeyItem["value"][tmpKey],
-                               "location": nowLoaction}
-                    keyQueue.put(tmpItem)
+            # 分割key
+            tmpKeysList = tmpKeyStr.split("_")
+            tmpParentType = tmpKeysList[0]
+            tmpItemKey = tmpKeysList[1]
+            tmpItemType = tmpKeysList[2]
+
+            tmpFinalLocation = copy.deepcopy(tmpLocation)
+            tmpFinalLocation.append(tmpKeyStr)
+
+            tmpItemVal=""
+
+            if tmpParentType == "root":
+                # 根节点的情况
+                tmpItemVal = "根节点"
+
+            elif tmpParentType == "list":
+                # 父节点为数组的情况，只处理第一个元素
+                if tmpItemKey!="0":
+                    continue
+                else:
+                    # 获取父节点的显示名
+                    tmpParentKey = tmpFinalLocation[-2]
+                    tmpParentShowStr = tmpParentKey.split("_")[1]
+                    tmpItemVal = f"[{tmpValObj['level']}][{tmpParentShowStr}][元素0]"
             else:
-                # 处理数组的情况
-                nowListCount = tmpKeyItem["key"]
-                nowLoaction = tmpKeyItem["location"]
-                if len(nowLoaction) != 0:
-                    nowLoaction[-1]["type"] = 1
-                    nowLoaction[-1]["listCount"] = nowListCount
-                    nowParentObj = tmpKeyItem["parent"]
-                    nowParentObj.setText(2, "数组[长度为{}]".format(nowListCount))
-                    nowParentObj.setText(3, "")
-                else:
-                    # 根节点就是数组
-                    tmpTreeItem = QTreeWidgetItem(tmpKeyItem["parent"])
-                    tmpTreeItem.setText(2, "数组[长度为{}]".format(nowListCount))
-                    tmpTreeItem.setText(1, "根节点")
-                    tmpTreeItem.setText(3, json.dumps(nowLoaction))
-                    tmpKeyItem["parent"] = tmpTreeItem
-                    nowLocDic = {"value": "", "type": 1, "listCount": nowListCount}  # 0表示值（包括值和字典类型）,1表示数组
-                    nowLoaction.append(nowLocDic)
+                # 父节点为字典的情况
+                tmpItemVal = f"[{tmpValObj['level']}]{tmpItemKey}"
 
-                for tmpKey in tmpKeyItem["value"].keys():
-                    tmpItem = {"key": tmpKey, "parent": tmpKeyItem["parent"], "value": tmpKeyItem["value"][tmpKey],
-                               "location": nowLoaction}
-                    keyQueue.put(tmpItem)
+            # 创建一个节点
+            tmpTreeItemObj = QTreeWidgetItem(tmpParentWidget)
+            tmpTreeItemObj.setCheckState(0, Qt.Unchecked)
+
+            # 设置节点显示值
+            tmpTreeItemObj.setText(1, tmpItemVal)
+
+            if tmpItemType == "dict":
+                tmpItemTypeVal = "字典"
+            elif tmpItemType == "list":
+                tmpItemTypeVal = f"数组[长度为{tmpValObj['value']}]"
+            else:
+                tmpItemTypeVal = "值"
+
+            # 设定节点类型
+            tmpTreeItemObj.setText(2, tmpItemTypeVal)
+
+            # 设置结构字符串
+            tmpTreeItemObj.setText(3, json.dumps(tmpFinalLocation))
+
+            # 遍历子节点并添加到队列
+            tmpNextItems = tmpValObj["nextItems"]
+            for tmpKey, tmpVal in tmpNextItems.items():
+                itemQueue.put(
+                    {"key": tmpKey, "parent": tmpTreeItemObj, "value": tmpVal,
+                     "location": tmpFinalLocation})
+
         self.responseAnaResultTreeWidget.itemChanged['QTreeWidgetItem*', 'int'].connect(
             self.responseAnaResultTreeWidgetCheckboxChanged)
 
@@ -651,50 +745,26 @@ class Main(QMainWindow, Ui_mainForm):
             pass
 
     ### 输出结果界面方法
-    def doAddResponseToResult(self, reDic):
-        # 获取值
-        inputDic = reDic["input"]
-        repDic = reDic["result"]
-        dataDic = reDic["extraData"]
-        repStatus = repDic["status"]
-        reqFlag = repDic["checkFlag"]
-        nowInput = dataDic["input"]
-        ifEnd = dataDic["ifEnd"]
-        jsonArgList = dataDic["jsonArgList"]
-        reqResultStr = "成功" if reqFlag else repDic["resultStr"]
-        if reqFlag:
-            resultRowList = []
-            pageContent = repDic["pageContent"]
-            pageContent = self.anaResponseByResponseType(pageContent)
-            pageJsonDic = json.loads(pageContent)
-            for nowRowIndex, nowRowData in enumerate(jsonArgList):
-                if nowRowIndex == 0:
-                    continue
-                resultRowList.append([])
-                for nowColIndex, nowColData in enumerate(nowRowData):
-                    nowJsonArg = nowColData
-                    try:
-                        evalText = "pageJsonDic" + nowJsonArg
-                        nowVal = eval(evalText)
-                    except:
-                        nowVal = "None"
-                    resultRowList[nowRowIndex - 1].append(nowVal)
-        else:
-            maxRowCount = 1
-            resultRowList = [["None" * len(jsonArgList[0])]]
+    def doAddRowsToResultTable(self,addDict):
         # 写入表格
+        nowRowsList = addDict["resultsList"]
+        nowInputStr = addDict["inputStr"]
+        nowPackageIndex = addDict["packageIndex"]
         nowTable = self.resultTable
-        for nowRowIndex, nowRowList in enumerate(resultRowList):
+        for nowRowIndex, nowRowList in enumerate(nowRowsList):
             nowRowCount = nowTable.rowCount()
             nowTable.insertRow(nowRowCount)
-            nowTable.setItem(nowRowCount, 0, myUtils.createTableItem(nowInput))
-            nowTable.setItem(nowRowCount, 1, myUtils.createTableItem(repStatus))
-            nowTable.setItem(nowRowCount, 2, myUtils.createTableItem(reqResultStr))
+            nowTable.setItem(nowRowCount, 0, myUtils.createTableItem(nowInputStr))
             for tmpIndex in range(len(nowRowList)):
-                nowTable.setItem(nowRowCount, 3 + tmpIndex,
+                nowTable.setItem(nowRowCount, 1 + tmpIndex,
                                  myUtils.createTableItem(nowRowList[tmpIndex]))
 
-        if ifEnd:
+        # 给请求完成计数器+1
+        self.solvedSendPackageCount += 1
+        warningStr = f"[{self.solvedSendPackageCount}/{self.sendPackageTotalCount}] 第{nowPackageIndex + 1}次请求完成，本次共产生{len(nowRowsList)}行数据，请在[输出结果]页面查看"
+        self.writeLog(warningStr)
+
+        if self.solvedSendPackageCount >= self.sendPackageTotalCount:
             warningStr = "已完成所有请求，请求结果请查看[输出结果]页面"
             self.writeLog(warningStr, 0)
 
