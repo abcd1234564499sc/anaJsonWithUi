@@ -13,6 +13,10 @@
   <property name="windowTitle">
    <string>JSON返回值解析工具</string>
   </property>
+  <property name="windowIcon">
+   <iconset resource="../resource/srouce.qrc">
+    <normaloff>:/img/icon.png</normaloff>:/img/icon.png</iconset>
+  </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout_3" stretch="0,4">
     <item>
@@ -433,7 +437,9 @@ p, li { white-space: pre-wrap; }
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
  </widget>
- <resources/>
+ <resources>
+  <include location="../resource/srouce.qrc"/>
+ </resources>
  <connections>
   <connection>
    <sender>addCharIdenButton</sender>
