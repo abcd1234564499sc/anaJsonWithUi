@@ -7,6 +7,8 @@ from queue import Queue
 
 from PyQt5.QtCore import QThread, pyqtSignal
 
+import myUtils
+
 
 class AnaJsonThread(QThread):
     signal_result = pyqtSignal(dict)
@@ -14,6 +16,7 @@ class AnaJsonThread(QThread):
     def __init__(self):
         super(AnaJsonThread, self).__init__()
         self.queue = Queue()
+        self.splitChar = myUtils.getSplitChar()
 
     def stopThread(self):
         self.runFlag = False
@@ -41,11 +44,11 @@ class AnaJsonThread(QThread):
                     tmpSelectStructs = nowSelectStructStr.split(",")
                     tmpLevel = len(tmpSelectStructs)-1
                     tmpHeaderStructStr = tmpSelectStructs[-1]
-                    tmpSplitedHeaderStructList = tmpHeaderStructStr.split("_")
+                    tmpSplitedHeaderStructList = tmpHeaderStructStr.split(self.splitChar)
                     tmpHeaderKey = tmpSplitedHeaderStructList[1]
                     tmpHeaderStr = f"[{tmpLevel}]{tmpHeaderKey}"
                     for tmpStructStr in tmpSelectStructs:
-                        tmpSplitedStructStrList = tmpStructStr.split("_")
+                        tmpSplitedStructStrList = tmpStructStr.split(self.splitChar)
                         tmpParentType = tmpSplitedStructStrList[0]
                         tmpJsonKey = tmpSplitedStructStrList[1]
                         tmpType = tmpSplitedStructStrList[2]

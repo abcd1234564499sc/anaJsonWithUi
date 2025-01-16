@@ -30,6 +30,9 @@ def createAnalysisJsonResultItem():
 
     return reDict
 
+def getSplitChar():
+    return "☯"
+
 # 处理json对象，返回一个用字典存储的树状结构
 # 返回结果字典，列表中存储一个树状结构，每个节点代表一个json item
 # 节点key的格式为：<父节点类型(list、dict、root)>_<父节点获取该子节点的关键词，dict为key值，list为index>_<该节点的类型，字典为dict，列表为list，其他值为该值的类型：str、int、float等>，节点的值为一个字典结构，由createAnalysisJsonResultItem函数定义
@@ -39,9 +42,11 @@ def createAnalysisJsonResultItem():
 def analysisJsonObjToDict(jsonObj):
     reDict = {}
 
+    connectStr = getSplitChar()
+
     anaQueue = queue.Queue()
 
-    anaQueue.put({"obj":jsonObj,"resultDict":reDict,"level":0,"keyStr":"root_0"})
+    anaQueue.put({"obj":jsonObj,"resultDict":reDict,"level":0,"keyStr":f"root{connectStr}0"})
 
     while not anaQueue.empty():
         tmpObjDict = anaQueue.get()
@@ -51,15 +56,15 @@ def analysisJsonObjToDict(jsonObj):
         tmpKeyStr = tmpObjDict["keyStr"]
 
         if type(tmpJsonObj) == dict:
-            tmpResultKey = f"{tmpKeyStr}_dict"
+            tmpResultKey = f"{tmpKeyStr}{connectStr}dict"
             tmpResultItem = createAnalysisJsonResultItem()
             tmpResultItem["level"] = tmpLevel
             tmpResultItem["value"] = str(len(tmpJsonObj.keys()))
             tmpResultDict[tmpResultKey] = tmpResultItem
             for tmpKey,tmpVal in tmpJsonObj.items():
-                anaQueue.put({"obj": copy.deepcopy(tmpVal), "resultDict": tmpResultDict[tmpResultKey]["nextItems"], "level": tmpLevel+1,"keyStr":f"dict_{tmpKey}"})
+                anaQueue.put({"obj": copy.deepcopy(tmpVal), "resultDict": tmpResultDict[tmpResultKey]["nextItems"], "level": tmpLevel+1,"keyStr":f"dict{connectStr}{tmpKey}"})
         elif type(tmpJsonObj) == list:
-            tmpResultKey = f"{tmpKeyStr}_list"
+            tmpResultKey = f"{tmpKeyStr}{connectStr}list"
             tmpResultItem = createAnalysisJsonResultItem()
             tmpResultItem["level"] = tmpLevel
             tmpResultItem["value"] = str(len(tmpJsonObj))
@@ -67,9 +72,9 @@ def analysisJsonObjToDict(jsonObj):
             for tmpIndex,tmpVal in enumerate(tmpJsonObj):
                 anaQueue.put(
                     {"obj": copy.deepcopy(tmpVal), "resultDict": tmpResultDict[tmpResultKey]["nextItems"], "level": tmpLevel + 1,
-                     "keyStr": f"list_{tmpIndex}"})
+                     "keyStr": f"list{connectStr}{tmpIndex}"})
         else:
-            tmpResultKey = f"{tmpKeyStr}_{type(tmpJsonObj).__name__}"
+            tmpResultKey = f"{tmpKeyStr}{connectStr}{type(tmpJsonObj).__name__}"
             tmpResultItem = createAnalysisJsonResultItem()
             tmpResultItem["level"] = tmpLevel
             tmpResultItem["value"] = str(tmpJsonObj)

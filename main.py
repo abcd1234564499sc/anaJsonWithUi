@@ -56,6 +56,7 @@ class Main(QMainWindow, Ui_mainForm):
         self.exportExcellThread = None
         self.sendPackageTotalCount = 0
         self.solvedSendPackageCount = 0
+        self.splitChar = myUtils.getSplitChar()
 
     def createResponseTypeComboBox(self):
         for tmpIndex, tmpResponseTypeDic in enumerate(self.responseTypeList):
@@ -371,7 +372,7 @@ class Main(QMainWindow, Ui_mainForm):
                 tmpSelectStructList = tmpSelectStructStr.split(",")
                 tmpLevel = len(tmpSelectStructList)-1
                 tmpHeaderStructStr = tmpSelectStructList[-1]
-                tmpSplitedHeaderStructList = tmpHeaderStructStr.split("_")
+                tmpSplitedHeaderStructList = tmpHeaderStructStr.split(self.splitChar)
                 tmpHeaderKey = tmpSplitedHeaderStructList[1]
                 tmpHeaderStr = f"[{tmpLevel}]{tmpHeaderKey}"
                 nowHeaderList.append(tmpHeaderStr)
@@ -567,7 +568,7 @@ class Main(QMainWindow, Ui_mainForm):
             tmpLocation = tmpItemDict["location"]
 
             # 分割key
-            tmpKeysList = tmpKeyStr.split("_")
+            tmpKeysList = tmpKeyStr.split(self.splitChar)
             tmpParentType = tmpKeysList[0]
             tmpItemKey = tmpKeysList[1]
             tmpItemType = tmpKeysList[2]
@@ -588,7 +589,7 @@ class Main(QMainWindow, Ui_mainForm):
                 else:
                     # 获取父节点的显示名
                     tmpParentKey = tmpFinalLocation[-2]
-                    tmpParentShowStr = tmpParentKey.split("_")[1]
+                    tmpParentShowStr = tmpParentKey.split(self.splitChar)[1]
                     tmpItemVal = f"[{tmpValObj['level']}][{tmpParentShowStr}][元素0]"
             else:
                 # 父节点为字典的情况
