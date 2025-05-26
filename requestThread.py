@@ -23,6 +23,12 @@ class RequestThread(QThread):
                 repDic = myUtils.requestsUrl(inputDic["url"], cookie=inputDic["cookie"], header=inputDic["header"],
                                              data=inputDic["data"], type=inputDic["type"],
                                              proxies=inputDic["proxies"])
+                # 重构获取的结果列表
+                if repDic["checkFlag"]:
+                    tmpReqResultList = repDic.pop("resultList")
+                    tmpReqResultDict = tmpReqResultList[-1]
+                    repDic.update(tmpReqResultDict)
+
                 resultDic = {"input": inputDic, "result": repDic, "extraData": inputDic["extraData"]}
                 self.signal_result.emit(resultDic)
             else:

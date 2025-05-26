@@ -8,6 +8,7 @@ import queue
 import re
 import socket
 import traceback
+import warnings
 
 import openpyxl as oxl
 import requests
@@ -19,6 +20,29 @@ from openpyxl.styles import Border, Side, Font, PatternFill
 borderNumDic = {-1: None, 0: "thin"}
 # 降低SECLEVEL级别，防止SSL异常
 requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS = 'DEFAULT:@SECLEVEL=1'
+STATUS_REASONS = {
+        "200": "OK",
+        "201": "Created",
+        "202": "Accepted",
+        "204": "No Content",
+        "301": "Moved Permanently",
+        "302": "Found",
+        "304": "Not Modified",
+        "400": "Bad Request",
+        "401": "Unauthorized",
+        "403": "Forbidden",
+        "404": "Not Found",
+        "405": "Method Not Allowed",
+        "500": "Internal Server Error",
+        "503": "Service Unavailable",
+    }
+
+# 获得一个用于模拟浏览器的header
+def getBrowerHeader():
+    header = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.100 Safari/537.36"
+    }
+    return header
 
 
 def createAnalysisJsonResultItem():
@@ -163,79 +187,167 @@ def getNowSeconed():
     nowDateStr = nowDate.strftime(formatStr)
     return nowDateStr
 
+# 从html源码中获取标题部分的值
+def findHtmlTitleWithContent(htmlContent):
+    title = ""
+    reTitleList = re.findall(r"<title.*?>(.+?)</title>", htmlContent)
+    title = "None" if len(reTitleList) == 0 else reTitleList[0]
+    return title
+
+ # 通过key值获取header字典中的值，忽略key值的大小写
+def getHttpHeaderValWithKey(headerKey, headerDict):
+    reVal = None
+    headerKey = headerKey.strip()
+    for tmpKey, tmpVal in headerDict.items():
+        if headerKey.lower() == tmpKey.lower():
+            reVal = headerDict[tmpKey]
+            break
+        else:
+            continue
+    return reVal
+
+
 
 # 访问URL,type表示请求类型，0为GET，1为POST，2为PUT
-# 返回值类型如下：
+# 若响应自动跳转则会自动请求，并记录跳转响应，
+# 返回一个字典，字典结构如下：
 # {
-# "url":传入URL,
-# "resultStr":访问结果字符串,
-# "checkFlag":标志是否访问成功的布尔类型变量,
-# "title":访问成功时的页面标题,
-# "pageContent":访问成功时的页面源码，
-# "status":访问的响应码，
-# "requestSeconed":访问耗时，单位为秒
+# "checkFlag":标志是否请求成功的布尔类型变量,
+# "resultStr":请求结果字符串,
+# "resultList":响应字典列表
 # }
-def requestsUrl(url, cookie={}, header={}, data={}, files=None, type=0, reqTimeout=10, readTimeout=120,
-                allow_redirects=False, session=None, proxies=None):
-    if session is None:
-        session = requests.session()
-    else:
-        pass
-    resDic = {}
-    url = url.strip()
-    url = url.strip()
+# 响应字典结构如下：
+# {
+# "url":请求URL,
+# "title":响应标题,
+# "pageContent":访问成功时的页面源码，
+# "status":访问的响应码,
+# "responseHeaders":响应头，是一个字典,
+# "responseCostSecond":响应时间（秒）,
+# "response":requests库请求后返回的response对象
+# }
+def requestsUrl(url, cookie={}, header={}, data={}, type=0, reqTimeout=10, readTimeout=10, proxies=None,
+                dataType="form", files={}):
+    warnings.filterwarnings("ignore")
+    reDict = {}
+    reDict["checkFlag"] = False
+    reDict["resultStr"] = ""
+    reDict["resultList"] = []
 
-    resultStr = ""
-    checkedFlag = False
-    status = ""
-    title = ""
-    reContent = ""
-    totalSeconed = 0
+    url = url.strip()
     timeout = (reqTimeout, readTimeout)
-    header = header if header != {} else {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.100 Safari/537.36"
-    }
+    header = header if header != {} else getBrowerHeader()
+
+    # 请求头添加不缓存，处理304响应
+    header['If-None-Natch'] = ''
+    header['If-Modified-Since'] = ''
+
+    checkedFlag = False
+    resultStr = ""
+    resultList = []
+
     try:
         if type == 0:
-            response = session.get(url, headers=header, verify=False, cookies=cookie, timeout=timeout,
-                                   allow_redirects=allow_redirects, proxies=proxies)
+            response = requests.get(url, headers=header, verify=False, cookies=cookie, timeout=timeout,
+                                    proxies=proxies)
         elif type == 1:
-            response = session.post(url, headers=header, verify=False, cookies=cookie, data=data, files=files,
-                                    timeout=timeout, allow_redirects=allow_redirects, proxies=proxies)
+            if dataType == "form":
+                response = requests.post(url, headers=header, verify=False, cookies=cookie, data=data,
+                                         timeout=timeout,
+                                         proxies=proxies)
+            elif dataType == "json":
+                response = requests.post(url, headers=header, verify=False, cookies=cookie, json=data,
+                                         timeout=timeout,
+                                         proxies=proxies)
+            elif dataType == "files":
+                response = requests.post(url, headers=header, verify=False, cookies=cookie, data=data, files=files,
+                                         timeout=timeout,
+                                         proxies=proxies)
+            else:
+                response = requests.post(url, headers=header, verify=False, cookies=cookie, data=data,
+                                         timeout=timeout,
+                                         proxies=proxies)
         elif type == 2:
-            response = session.put(url, headers=header, verify=False, cookies=cookie, data=data, files=files,
-                                   timeout=timeout, allow_redirects=allow_redirects, proxies=proxies)
+            response = requests.put(url, headers=header, verify=False, cookies=cookie, data=data, timeout=timeout,
+                                    proxies=proxies)
         else:
-            pass
-        status = response.status_code
-        totalSeconed = response.elapsed.total_seconds()
-        if str(status)[0] == "2" or str(status)[0] == "3":
-            # 获得页面编码
-            pageEncoding = response.apparent_encoding
-            # 设置页面编码
-            response.encoding = pageEncoding
-            # 获得页面内容
-            reContent = response.text
-            reTitleList = re.findall(r"<title.*?>(.+?)</title>", reContent)
-            title = "成功访问，但无法获得标题" if len(reTitleList) == 0 else reTitleList[0]
-            resultStr = "验证成功，标题为：{0}".format(title)
-            checkedFlag = True
-        else:
-            resultStr = "验证失败，状态码为{0}".format(status)
+            response = requests.get(url, headers=header, verify=False, cookies=cookie, timeout=timeout,
+                                    proxies=proxies)
+
+        # request请求成功
+        checkedFlag = True
+
+        # 处理自动跳转
+        tmpResponseList = []
+        tmpResponseList = response.history + [response]
+
+        tmpResultStrList = []
+
+        for tmpResponse in tmpResponseList:
+            tmpResDic = {}
+            status = tmpResponse.status_code
+            responseHeaders = dict(tmpResponse.headers)
+            responseCostSecond = tmpResponse.elapsed.total_seconds()
+            reContent = ""
+            reTitle = ""
+            if str(status)[0] == "2":
+                # 获得页面编码
+                pageEncoding = tmpResponse.apparent_encoding
+                # 设置页面编码
+                tmpResponse.encoding = pageEncoding
+                # 获得页面内容
+                reContent = tmpResponse.text
+                title = findHtmlTitleWithContent(reContent)
+                reTitle = title
+                tmpResultStr = f"[{status}] 标题为：{title}"
+                tmpResultStrList.append(tmpResultStr)
+            elif str(status)[0] == "3":
+                tmpLocation = getHttpHeaderValWithKey("location", responseHeaders)
+                if tmpLocation is None:
+                    tmpLocation = "未知路径"
+                    checkedFlag = False
+                else:
+                    pass
+                tmpResultStr = f"[{status}] 跳转至{tmpLocation}"
+                tmpResultStrList.append(tmpResultStr)
+            elif str(status).strip() in STATUS_REASONS.keys():
+                statusStr = STATUS_REASONS.get(str(status).strip(), "未知响应码")
+                tmpResultStr = f"[{status}] {statusStr}"
+                tmpResultStrList.append(tmpResultStr)
+            else:
+                tmpResultStr = f"[{status}] 未知响应码"
+                tmpResultStrList.append(tmpResultStr)
+
+            tmpResDic["url"] = tmpResponse.url
+            tmpResDic["title"] = reTitle
+            tmpResDic["pageContent"] = reContent
+            tmpResDic["status"] = status
+            tmpResDic["responseHeaders"] = responseHeaders
+            tmpResDic["responseCostSecond"] = responseCostSecond
+            tmpResDic["response"] = tmpResponse
+
+            resultList.append(tmpResDic)
+
+        # 构造结果字符串
+        if len(tmpResultStrList) <= 0:
+            resultStr = "[异常] 空响应"
             checkedFlag = False
+        elif len(tmpResultStrList) > 1:
+            tmpResultStrList = [f"({r})" for r in tmpResultStrList]
+            resultStr = "->".join(tmpResultStrList)
+        else:
+            resultStr = tmpResultStrList[0]
+
     except Exception as e:
-        resultStr = traceback.format_exc()
+        resultStr = f"[异常] {str(e)}"
         checkedFlag = False
 
-    # 构建返回结果
-    resDic["url"] = url
-    resDic["resultStr"] = resultStr
-    resDic["checkFlag"] = checkedFlag
-    resDic["title"] = title
-    resDic["status"] = status
-    resDic["pageContent"] = reContent
-    resDic["requestSeconed"] = totalSeconed
-    return resDic
+    reDict["checkFlag"] = checkedFlag
+    reDict["resultStr"] = resultStr
+    reDict["resultList"] = resultList
+
+    return reDict
+
 
 
 # 传入一个请求包格式字符串，解析并返回一个格式化的请求包字典，用于进行requests请求
