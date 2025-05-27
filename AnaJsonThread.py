@@ -62,7 +62,11 @@ class AnaJsonThread(QThread):
                             for tmpSavedIndex,tmpSavedItem in enumerate(tmpSavedResultList):
                                 if type(tmpSavedItem)!=list:
                                     tmpResultList.append(None)
-                                    tmpVisitLinkDictList.append(None)
+                                    # 更新JSON访问链列表
+                                    tmpUpdateVisitLinkDict = copy.deepcopy(tmpSavedVisitLinkDictList[tmpSavedIndex])
+                                    tmpVisitLinkHeader = f"[{tmpStructIndex}]{tmpJsonKey}"
+                                    tmpUpdateVisitLinkDict[tmpVisitLinkHeader] = json.dumps(None)
+                                    tmpVisitLinkDictList.append(tmpUpdateVisitLinkDict)
                                 else:
                                     for tmpSavedListIndex,tmpItem in enumerate(tmpSavedItem):
                                         tmpResultList.append(tmpItem)
@@ -106,44 +110,6 @@ class AnaJsonThread(QThread):
                 mergedResultList = self.mergeSelectedJsonVaList(selectedJsonVaList)
                 sortedResultList = self.createResultListWithHeaderList(mergedResultList,nowHeaderList)
 
-                # # 对获取的json结果列表按headerLevel进行升序排序
-                # selectedJsonVaList.sort(key=lambda d:len(d["resultList"]))
-                #
-                # # 合并相同长度的结果
-                # mergeJsonValDict = {}
-                # for nowSelectedJsonValDict in selectedJsonVaList:
-                #     tmpHeaderStr = nowSelectedJsonValDict["headerStr"]
-                #     tmpResultList = nowSelectedJsonValDict["resultList"]
-                #     tmpResultListLength = len(tmpResultList)
-                #
-                #     if tmpResultListLength not in mergeJsonValDict.keys():
-                #         mergeJsonValDict[tmpResultListLength] = {"headerStrList":[tmpHeaderStr],"resultLists":[[result] for result in tmpResultList]}
-                #     else:
-                #         tmpAimAppendDict = mergeJsonValDict[tmpResultListLength]
-                #         tmpAimAppendDict["headerStrList"].append(tmpHeaderStr)
-                #         for tmpAimAppendResultRowIndex,tmpAimAppendResultRow in enumerate(tmpAimAppendDict["resultLists"]):
-                #             tmpAimAppendResultRow.append(tmpResultList[tmpAimAppendResultRowIndex])
-                #
-                # # 合并不同长度的结果（直接相乘）
-                # seconedMergeResultList = []
-                # seconedMergeHeaderList = []
-                # for tmpLen,tmpJsonValDict in mergeJsonValDict.items():
-                #     tmpHeaderList = tmpJsonValDict["headerStrList"]
-                #     tmpResultList = tmpJsonValDict["resultLists"]
-                #
-                #     seconedMergeHeaderList = seconedMergeHeaderList + tmpHeaderList
-                #     if len(seconedMergeResultList)==0:
-                #         seconedMergeResultList = copy.deepcopy(tmpResultList)
-                #     else:
-                #         tmpMergeList = []
-                #         for tmpSavedResultRow in seconedMergeResultList:
-                #             for tmpNowResultRow in tmpResultList:
-                #                 tmpMergeResultRow = tmpSavedResultRow+tmpNowResultRow
-                #                 tmpMergeList.append(tmpMergeResultRow)
-                #         seconedMergeResultList = copy.deepcopy(tmpMergeList)
-                #
-
-                #
                 # 构建返回结果并返回
                 reDict["packageIndex"] = nowPackageIndex
                 reDict["resultsList"] = sortedResultList
@@ -169,11 +135,6 @@ class AnaJsonThread(QThread):
 
             # 将tmpMergedJsonValList转换为一个以headerStr为key的字典
             tmpMergedJsonValDict = {d["headerStr"]: d for d in tmpMergedJsonValList}
-            # 为字典添加一个root节点(若不存在)
-            # tmpRootHeaderStr = "[0]root"
-            # if tmpRootHeaderStr not in tmpMergedJsonValDict.keys():
-            #     tmpMergedJsonValDict[tmpRootHeaderStr] = {"headerLevel": 0, "headerStr": tmpRootHeaderStr,
-            #                                               "resultList": [], "visitLinkDictList": []}
 
             # 构造一个headerStr列表，并按headerLevel降序排序
             tmpAllHeaderStrList = list(tmpMergedJsonValDict.keys())
